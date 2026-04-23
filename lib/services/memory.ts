@@ -46,6 +46,26 @@ type ApiErrorResponse = {
   error?: string
 }
 
+function getApiUrl(path: string) {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "")
+  return baseUrl ? `${baseUrl}${path}` : path
+}
+
+async function getAuthHeaders() {
+  const supabase = getSupabaseBrowserClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session?.access_token) {
+    return {}
+  }
+
+  return {
+    Authorization: `Bearer ${session.access_token}`,
+  }
+}
+
 async function getErrorMessage(response: Response) {
   try {
     const data = (await response.json()) as ApiErrorResponse
@@ -65,7 +85,14 @@ async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
     headers.set("Content-Type", "application/json")
   }
 
-  const response = await fetch(input, {
+  const authHeaders = await getAuthHeaders()
+  Object.entries(authHeaders).forEach(([key, value]) => {
+    if (!headers.has(key)) {
+      headers.set(key, value)
+    }
+  })
+
+  const response = await fetch(getApiUrl(input), {
     ...init,
     headers,
   })
@@ -145,7 +172,7 @@ export async function updateMemory(id: number, input: UpdateMemoryInput): Promis
 
 /** 메모리 삭제. 에러 시 throw. */
 export async function deleteMemory(id: number): Promise<void> {
-  const supabase = getSupabaseBrowserClient()
-  const { error } = await supabase.from("memories").delete().eq("id", id)
-  if (error) throw error
+  await requestJson<void>(`/api/memories/${id}`, {
+    method: "DELETE",
+  })
 }
