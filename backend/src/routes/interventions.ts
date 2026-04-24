@@ -17,6 +17,63 @@ type FeedbackInput = {
 
 export const interventionsRouter = Router()
 
+interventionsRouter.get("/insight-state", async (request, response, next) => {
+  try {
+    const { supabase, user } = await getSupabaseUserClient(request)
+
+    const [{ data: interventions, error: interventionsError }, { data: latestByCreated, error: latestByCreatedError }, { data: latestByMemoryAt, error: latestByMemoryAtError }] =
+      await Promise.all([
+        supabase
+          .from("interventions")
+          .select("*")
+          .eq("status", "pending")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1),
+        supabase
+          .from("memories")
+          .select("processed")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1),
+        supabase
+          .from("memories")
+          .select("emotion_id")
+          .eq("user_id", user.id)
+          .order("memory_at", { ascending: false })
+          .limit(1),
+      ])
+
+    if (interventionsError) throw interventionsError
+    if (latestByCreatedError) throw latestByCreatedError
+    if (latestByMemoryAtError) throw latestByMemoryAtError
+
+    const intervention =
+      interventions && interventions.length > 0
+        ? (interventions[0] as Intervention)
+        : null
+
+    const hasUnprocessedLatestMemory = Boolean(
+      latestByCreated &&
+        latestByCreated.length > 0 &&
+        latestByCreated[0]?.processed === false,
+    )
+
+    const latestEmotionId =
+      latestByMemoryAt && latestByMemoryAt.length > 0
+        ? (latestByMemoryAt[0]?.emotion_id ?? null)
+        : null
+
+    response.json({
+      intervention,
+      hasUnprocessedLatestMemory,
+      latestEmotionId,
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
 interventionsRouter.get("/pending/latest", async (request, response, next) => {
   try {
     const { supabase, user } = await getSupabaseUserClient(request)

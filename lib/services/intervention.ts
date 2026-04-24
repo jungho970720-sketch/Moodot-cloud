@@ -9,6 +9,12 @@ export type Intervention = {
   created_at: string
 }
 
+export type AIInsightSnapshot = {
+  intervention: Intervention | null
+  hasUnprocessedLatestMemory: boolean
+  latestEmotionId: number | null
+}
+
 type ApiErrorResponse = {
   error?: string
 }
@@ -88,6 +94,10 @@ export async function getLatestPendingIntervention(): Promise<Intervention | nul
     }
     throw error
   }
+}
+
+export async function getAIInsightSnapshot(): Promise<AIInsightSnapshot> {
+  return requestJson<AIInsightSnapshot>("/api/interventions/insight-state")
 }
 
 export async function markInterventionAsShown(id: number): Promise<void> {

@@ -4,14 +4,13 @@ import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Character } from "@/components/ai/character"
 import {
+  getAIInsightSnapshot,
   getLatestPendingIntervention,
   markInterventionAsShown,
   markInterventionAsInteracted,
   submitFeedback,
   type Intervention,
 } from "@/lib/services/intervention"
-import { getRecentMemories } from "@/lib/services/memory"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
 type BgScheme = { gradient: string; glow: string; border: string }
 
@@ -92,69 +91,43 @@ export function AIInsight() {
   const [feedbackResponse, setFeedbackResponse] = useState<string | null>(null)
   const [aiState, setAiState] = useState<"idle" | "thinking" | "has_message">("idle")
 
-  // 초기 로드
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient()
-
-    getLatestPendingIntervention().then((data) => {
-      if (data) {
-        setIntervention(data)
-        setAiState("has_message")
-      }
-    })
-
-    // 최근 기록이 미처리 상태면 생각중
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      supabase.from("memories")
-        .select("processed")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .then(({ data }) => {
-          if (data?.[0]?.processed === false) setAiState("thinking")
-        })
-    })
-
-    getRecentMemories(1)
-      .then((memories) => {
-        setLatestEmotionId(memories[0]?.emotion_id ?? null)
-      })
-      .catch(() => {
-        setLatestEmotionId(null)
-      })
-      .finally(() => {
-        setIsLoading(false)
-      })
-  }, [])
-
-  // Realtime 구독 — memories INSERT/UPDATE + interventions INSERT
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient()
-
-    const memoriesChannel = supabase
-      .channel("memories-changes")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "memories" }, () => {
-        setAiState("thinking")
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "memories" }, (payload) => {
-        if (payload.new?.processed === true) {
-          setAiState((prev) => prev === "thinking" ? "idle" : prev)
+  const syncInsightState = async () => {
+    try {
+      const snapshot = await getAIInsightSnapshot()
+      setIntervention(snapshot.intervention)
+      setLatestEmotionId(snapshot.latestEmotionId)
+      setAiState(
+        snapshot.intervention
+          ? "has_message"
+          : snapshot.hasUnprocessedLatestMemory
+            ? "thinking"
+            : "idle",
+      )
+    } catch {
+      // 인증 전/일시 실패는 다음 폴링에서 복구
+      try {
+        const pendingIntervention = await getLatestPendingIntervention()
+        setIntervention(pendingIntervention)
+        if (pendingIntervention) {
+          setAiState("has_message")
         }
-      })
-      .subscribe()
+      } catch {
+        // noop
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-    const interventionsChannel = supabase
-      .channel("interventions-insert")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "interventions" }, (payload) => {
-        setIntervention(payload.new as Intervention)
-        setAiState("has_message")
-      })
-      .subscribe()
+  // API 기반 초기 로드 + 주기적 동기화
+  useEffect(() => {
+    void syncInsightState()
+    const intervalId = window.setInterval(() => {
+      void syncInsightState()
+    }, 8000)
 
     return () => {
-      supabase.removeChannel(memoriesChannel)
-      supabase.removeChannel(interventionsChannel)
+      window.clearInterval(intervalId)
     }
   }, [])
 
