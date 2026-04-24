@@ -1,7 +1,5 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
-// ---------- Types ----------
-
 export type Intervention = {
   id: number
   reason: string
@@ -11,62 +9,107 @@ export type Intervention = {
   created_at: string
 }
 
-// ---------- Functions ----------
+type ApiErrorResponse = {
+  error?: string
+}
+
+function getApiUrl(path: string) {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "")
+  return baseUrl ? `${baseUrl}${path}` : path
+}
+
+async function getAuthHeaders() {
+  const supabase = getSupabaseBrowserClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session?.access_token) {
+    return {}
+  }
+
+  return {
+    Authorization: `Bearer ${session.access_token}`,
+  }
+}
+
+async function getErrorMessage(response: Response) {
+  try {
+    const data = (await response.json()) as ApiErrorResponse
+    if (typeof data.error === "string" && data.error.trim() !== "") {
+      return data.error
+    }
+  } catch {
+    // ignore
+  }
+
+  return `요청이 실패했습니다. (${response.status})`
+}
+
+async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers)
+  if (init?.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json")
+  }
+
+  const authHeaders = await getAuthHeaders()
+  Object.entries(authHeaders).forEach(([key, value]) => {
+    if (!headers.has(key)) {
+      headers.set(key, value)
+    }
+  })
+
+  const response = await fetch(getApiUrl(input), {
+    ...init,
+    headers,
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response))
+  }
+
+  if (response.status === 204) {
+    return undefined as T
+  }
+
+  return (await response.json()) as T
+}
 
 export async function getLatestPendingIntervention(): Promise<Intervention | null> {
-  const supabase = getSupabaseBrowserClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data, error } = await supabase
-    .from("interventions")
-    .select("*")
-    .eq("status", "pending")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-
-  if (error) throw error
-  if (!data || data.length === 0) return null
-  return data[0] as Intervention
+  try {
+    return await requestJson<Intervention | null>("/api/interventions/pending/latest")
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("인증이 필요합니다.") || error.message.includes("(401)"))
+    ) {
+      return null
+    }
+    throw error
+  }
 }
 
 export async function markInterventionAsShown(id: number): Promise<void> {
-  const supabase = getSupabaseBrowserClient()
-  const { error } = await supabase
-    .from("interventions")
-    .update({ status: "shown" })
-    .eq("id", id)
-
-  if (error) throw error
+  await requestJson<void>(`/api/interventions/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "shown" }),
+  })
 }
 
 export async function markInterventionAsInteracted(id: number): Promise<void> {
-  const supabase = getSupabaseBrowserClient()
-  const { error } = await supabase
-    .from("interventions")
-    .update({ status: "interacted" })
-    .eq("id", id)
-
-  if (error) throw error
+  await requestJson<void>(`/api/interventions/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "interacted" }),
+  })
 }
 
 export async function submitFeedback(
   interventionId: number,
-  explicitScore: 2 | -2
+  explicitScore: 2 | -2,
 ): Promise<void> {
-  const supabase = getSupabaseBrowserClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-
-  const { error } = await supabase
-    .from("intervention_feedback")
-    .insert({
-      intervention_id: interventionId,
-      user_id: user.id,
-      explicit_score: explicitScore,
-    })
-
-  if (error) throw error
+  await requestJson<void>(`/api/interventions/${interventionId}/feedback`, {
+    method: "POST",
+    body: JSON.stringify({ explicitScore }),
+  })
 }

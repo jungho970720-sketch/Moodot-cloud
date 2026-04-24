@@ -5,6 +5,8 @@ import express, { type ErrorRequestHandler } from "express"
 
 import { getAllowedOrigins, getPort } from "./config/env.js"
 import { HttpError } from "./lib/supabase.js"
+import { collectionsRouter } from "./routes/collections.js"
+import { interventionsRouter } from "./routes/interventions.js"
 import { memoriesRouter } from "./routes/memories.js"
 
 const app = express()
@@ -29,6 +31,8 @@ app.get("/health", (_request, response) => {
 })
 
 app.use("/api/memories", memoriesRouter)
+app.use("/api/collections", collectionsRouter)
+app.use("/api/interventions", interventionsRouter)
 
 const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
   const status = error instanceof HttpError ? error.status : 500
