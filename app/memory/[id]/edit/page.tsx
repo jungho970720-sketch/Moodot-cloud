@@ -7,7 +7,6 @@ import {
   X, Smile, Frown, Meh, Leaf,
   Clock3, ChevronRight, ImagePlus, MapPinned, Trash2,
 } from "lucide-react"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { compressImage } from "@/lib/image-compression"
 import { uploadImage, getSignedUrl } from "@/lib/storage/image"
 import { getMemoryById, updateMemory, deleteMemory } from "@/lib/services/memory"
@@ -226,11 +225,8 @@ export default function EditMemoryPage() {
   const handlePhotoUpload = async (file: File) => {
     setUploadStatus("uploading")
     try {
-      const supabase = getSupabaseBrowserClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("로그인이 필요합니다.")
       const uploadFile = await compressImage(file)
-      const path = await uploadImage(uploadFile, user.id)
+      const path = await uploadImage(uploadFile)
       setImageUrl(path)
       setUploadStatus("success")
     } catch (e) {

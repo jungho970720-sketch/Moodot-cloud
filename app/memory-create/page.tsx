@@ -15,7 +15,6 @@ import {
   ImagePlus,
   MapPinned,
 } from "lucide-react"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { compressImage } from "@/lib/image-compression"
 import { uploadImage } from "@/lib/storage/image"
 import { createMemory } from "@/lib/services/memory"
@@ -281,11 +280,8 @@ export default function CreatePage() {
   const handlePhotoUpload = async (file: File) => {
     setUploadStatus("uploading")
     try {
-      const supabase = getSupabaseBrowserClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("로그인이 필요합니다.")
       const uploadFile = await compressImage(file)
-      const path = await uploadImage(uploadFile, user.id)
+      const path = await uploadImage(uploadFile)
       setImageUrl(path)
       setUploadStatus("success")
     } catch (error) {

@@ -8,6 +8,7 @@ import { HttpError } from "./lib/supabase.js"
 import { collectionsRouter } from "./routes/collections.js"
 import { interventionsRouter } from "./routes/interventions.js"
 import { memoriesRouter } from "./routes/memories.js"
+import { storageRouter } from "./routes/storage.js"
 
 const app = express()
 const allowedOrigins = getAllowedOrigins()
@@ -24,6 +25,7 @@ app.use(
     credentials: true,
   }),
 )
+app.use("/api/storage", express.json({ limit: "10mb" }), storageRouter)
 app.use(express.json({ limit: "1mb" }))
 
 app.get("/health", (_request, response) => {

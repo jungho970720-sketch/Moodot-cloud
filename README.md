@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Moodot
 
-## Getting Started
+Moodot is an emotional journaling app that is being split into independent
+frontend, backend, and AI responsibilities for cloud deployment practice.
 
-First, run the development server:
+## Current structure
+
+- `frontend`: Next.js user interface
+- `backend`: Express API under [`backend/`](/Users/jungho/Moodot-cloud/backend)
+- `ai worker`: Python service under [`service/`](/Users/jungho/Moodot-cloud/service)
+
+Current architecture notes are documented in
+[docs/architecture.md](/Users/jungho/Moodot-cloud/docs/architecture.md).
+
+## Current status
+
+The main FE/BE split has already been applied to these domains:
+
+- `memories`
+- `collections`
+- `interventions`
+- `ai-insight` state lookup
+- image upload / signed URL flow
+
+The app now follows this primary request flow:
+
+```text
+Frontend -> Backend API -> Supabase
+```
+
+## Local development
+
+Install root dependencies:
+
+```bash
+npm ci
+```
+
+Install backend dependencies:
+
+```bash
+npm --prefix backend install
+```
+
+Run the frontend:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Run the backend in a separate terminal:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cd backend
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Local ports:
 
-## Learn More
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:4000`
 
-To learn more about Next.js, take a look at the following resources:
+## Environment variables
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Core variables used by the current split runtime:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+MEMORY_TEXT_ENCRYPTION_KEY=
+NEXT_PUBLIC_API_BASE_URL=
+FRONTEND_ORIGIN=
+```
 
-## Deploy on Vercel
+See [docs/architecture.md](/Users/jungho/Moodot-cloud/docs/architecture.md) for
+more detail on how these are used.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deployment notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Frontend process name: `moodot`
+- Backend process name: `moodot-backend`
+- PM2 auto-start has been configured for EC2 runtime recovery
+- Elastic IP is used to keep the public address stable across restarts
+
+## Project docs
+
+- [Architecture](/Users/jungho/Moodot-cloud/docs/architecture.md)
+- [Memory API](/Users/jungho/Moodot-cloud/docs/memory-api.md)
+- [Memory text encryption migration](/Users/jungho/Moodot-cloud/docs/memories_text_encryption.sql)
+- [AI events](/Users/jungho/Moodot-cloud/docs/service/events.md)
+- [Database schema](/Users/jungho/Moodot-cloud/docs/service/database-schema.md)
+
+## Framework docs
+
+- [Next.js Documentation](https://nextjs.org/docs)
