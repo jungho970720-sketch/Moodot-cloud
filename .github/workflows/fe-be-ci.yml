@@ -1,0 +1,44 @@
+name: FE BE CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - "service/**"
+      - ".github/workflows/ai-worker-ci.yml"
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - "service/**"
+      - ".github/workflows/ai-worker-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: fe-be-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Build frontend
+        run: npm run build
+
+  backend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+      - name: Build backend
+        run: npm run build --prefix backend
