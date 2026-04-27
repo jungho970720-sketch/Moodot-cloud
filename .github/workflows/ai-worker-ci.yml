@@ -35,13 +35,11 @@ jobs:
       - name: Run AI worker tests
         run: pytest -q
 
-  ai-image-placeholder:
+  ai-docker-build:
     runs-on: ubuntu-latest
     needs: ai-tests
-    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
-      - name: Explain deploy gate
+      - name: Build AI worker image
         run: |
-          echo "AI worker workflow is isolated to service/** changes."
-          echo "Add ECR/ECS deploy steps here when infra secrets are ready."
+          docker build -f service/Dockerfile -t moodot-ai-worker:ci .
