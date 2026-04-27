@@ -5,6 +5,7 @@ import express, { type ErrorRequestHandler } from "express"
 
 import { getAllowedOrigins, getPort } from "./config/env.js"
 import { HttpError } from "./lib/supabase.js"
+import { authRouter } from "./routes/auth.js"
 import { collectionsRouter } from "./routes/collections.js"
 import { interventionsRouter } from "./routes/interventions.js"
 import { memoriesRouter } from "./routes/memories.js"
@@ -32,6 +33,7 @@ app.get("/health", (_request, response) => {
   response.json({ ok: true })
 })
 
+app.use("/api/auth", authRouter)
 app.use("/api/memories", memoriesRouter)
 app.use("/api/collections", collectionsRouter)
 app.use("/api/interventions", interventionsRouter)

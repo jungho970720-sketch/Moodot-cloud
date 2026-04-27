@@ -1,6 +1,20 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 
+function getApiUrl(path: string) {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "")
+  return baseUrl ? `${baseUrl}${path}` : path
+}
+
+async function getAccessToken() {
+  const supabase = getSupabaseBrowserClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  return session?.access_token ?? null
+}
+
 export async function signInAnonymously() {
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase.auth.signInAnonymously()
@@ -60,6 +74,40 @@ export async function getCurrentUser() {
   } catch {
     return null
   }
+}
+
+export async function mergeAnonymousToCurrent(anonUserId: string) {
+  const accessToken = await getAccessToken()
+
+  if (!accessToken) {
+    throw new Error("인증이 필요합니다.")
+  }
+
+  const response = await fetch(getApiUrl("/api/auth/merge-anonymous"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ anonUserId }),
+  })
+
+  if (response.ok) {
+    return
+  }
+
+  try {
+    const data = (await response.json()) as { error?: string }
+    if (typeof data.error === "string" && data.error.trim() !== "") {
+      throw new Error(data.error)
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error
+    }
+  }
+
+  throw new Error(`요청이 실패했습니다. (${response.status})`)
 }
 
 /**

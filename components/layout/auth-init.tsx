@@ -1,8 +1,11 @@
 "use client"
 
 import { useEffect } from "react"
-import { getCurrentUser, signInAnonymously } from "@/lib/supabase/auth"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import {
+  getCurrentUser,
+  mergeAnonymousToCurrent,
+  signInAnonymously,
+} from "@/lib/supabase/auth"
 
 export function AuthInit() {
   useEffect(() => {
@@ -38,21 +41,20 @@ export function AuthInit() {
 
       // uid 변경됨 → 익명 데이터를 현재 계정으로 병합
       console.debug("[merge] rpc called | anon_uid:", preAuthUid, "→ current_uid:", user.id)
-      const supabase = getSupabaseBrowserClient()
-      const { error } = await supabase.rpc("merge_anonymous_to_current", {
-        anon_user_id: preAuthUid,
-      })
-
-      if (error) {
-        console.error("[merge] rpc error:", error.code, error.message)
+      try {
+        await mergeAnonymousToCurrent(preAuthUid)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "병합에 실패했습니다."
+        console.error("[merge] rpc error:", message)
         // 실패 시 pre_auth_uid 유지 → 다음 로드에서 재시도
-      } else {
-        console.debug("[merge] rpc success | anon_uid:", preAuthUid, "→ current_uid:", user.id)
-        localStorage.removeItem("pre_auth_uid")
-        // merge 완료 후 전체 페이지를 다시 로드해 최신 데이터를 반영한다.
-        // merge와 데이터 fetching이 동시에 시작되므로 merge 전 상태가 화면에 남을 수 있다.
-        window.location.reload()
+        return
       }
+
+      console.debug("[merge] rpc success | anon_uid:", preAuthUid, "→ current_uid:", user.id)
+      localStorage.removeItem("pre_auth_uid")
+      // merge 완료 후 전체 페이지를 다시 로드해 최신 데이터를 반영한다.
+      // merge와 데이터 fetching이 동시에 시작되므로 merge 전 상태가 화면에 남을 수 있다.
+      window.location.reload()
     })
   }, [])
 
