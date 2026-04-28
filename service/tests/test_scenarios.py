@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 from typing import Tuple
 from unittest.mock import AsyncMock, MagicMock
+import pytest
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
@@ -23,6 +24,8 @@ sys.path.insert(0, str(project_root))
 from generators.message_generator import MessageGenerator
 from config.base_llm import BaseLLMProvider
 from scoring.behavior_adjuster import get_feedback_trend
+
+pytestmark = pytest.mark.asyncio
 
 
 # ══════════════════════════════════════════════════════════════════════════════

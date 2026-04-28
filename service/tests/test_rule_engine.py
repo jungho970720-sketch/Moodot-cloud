@@ -66,9 +66,9 @@ class TestRuleEngine:
         
         # Then
         assert result['should_intervene'] is True
-        assert result['reason'] == 'negative_streak'
+        assert result['reason'] == 'negative_pattern'
         assert result['rule'] == 'negative_streak'
-        assert result['tone'] == 'empathetic'
+        assert result['tone'] == 'supportive'
     
     @pytest.mark.asyncio
     async def test_no_recent_record_triggers_intervention(self, rule_engine):

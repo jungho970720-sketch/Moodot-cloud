@@ -16,6 +16,7 @@ pytest: pytest tests/test_units_rules.py -v
 import asyncio
 import sys
 from pathlib import Path
+import pytest
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
@@ -32,6 +33,8 @@ from models.intervention import (
 )
 
 _results: list[dict] = []
+
+pytestmark = pytest.mark.asyncio
 
 
 def log_result(name: str, passed: bool, issues: str = ""):
