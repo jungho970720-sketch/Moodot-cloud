@@ -25,8 +25,6 @@ from generators.message_generator import MessageGenerator
 from config.base_llm import BaseLLMProvider
 from scoring.behavior_adjuster import get_feedback_trend
 
-pytestmark = pytest.mark.asyncio
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Mock 헬퍼
@@ -171,6 +169,7 @@ def test_validation_retry():
 # 3. 피드백 트렌드 시나리오
 # ══════════════════════════════════════════════════════════════════════════════
 
+@pytest.mark.asyncio
 async def test_feedback_trend():
     print("\n" + "█"*60)
     print("  3. 피드백 트렌드 시나리오")

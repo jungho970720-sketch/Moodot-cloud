@@ -34,8 +34,6 @@ from models.intervention import (
 
 _results: list[dict] = []
 
-pytestmark = pytest.mark.asyncio
-
 
 def log_result(name: str, passed: bool, issues: str = ""):
     _results.append({"name": name, "passed": passed, "issues": issues})
@@ -79,6 +77,7 @@ def test_intervention_tone():
 # 2. NegativeStreakRule
 # ══════════════════════════════════════════════════════════════════════════════
 
+@pytest.mark.asyncio
 async def test_negative_streak():
     print("\n[ 2. NegativeStreakRule ]")
 
@@ -125,6 +124,7 @@ async def test_negative_streak():
 # 3. NoRecentRecordRule
 # ══════════════════════════════════════════════════════════════════════════════
 
+@pytest.mark.asyncio
 async def test_no_recent_record():
     print("\n[ 3. NoRecentRecordRule ]")
 
@@ -162,6 +162,7 @@ async def test_no_recent_record():
 # 4. NegativeRatioRule
 # ══════════════════════════════════════════════════════════════════════════════
 
+@pytest.mark.asyncio
 async def test_negative_ratio():
     print("\n[ 4. NegativeRatioRule ]")
 
@@ -198,6 +199,7 @@ async def test_negative_ratio():
 # 5. PositiveStreakRule
 # ══════════════════════════════════════════════════════════════════════════════
 
+@pytest.mark.asyncio
 async def test_positive_streak():
     print("\n[ 5. PositiveStreakRule ]")
 
@@ -233,6 +235,7 @@ async def test_positive_streak():
 # 6. FrequencyLimitRule
 # ══════════════════════════════════════════════════════════════════════════════
 
+@pytest.mark.asyncio
 async def test_frequency_limit():
     print("\n[ 6. FrequencyLimitRule ]")
 
