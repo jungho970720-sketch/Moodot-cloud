@@ -2,11 +2,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { getMemories, getMemoryById } from "@/lib/services/memory"
 
+const { getSessionMock } = vi.hoisted(() => ({
+  getSessionMock: vi.fn(),
+}))
+
+vi.mock("@/lib/supabase/client", () => ({
+  getSupabaseBrowserClient: () => ({
+    auth: {
+      getSession: getSessionMock,
+    },
+  }),
+}))
+
 describe("memory service", () => {
   const fetchMock = vi.fn<typeof fetch>()
 
   beforeEach(() => {
     fetchMock.mockReset()
+    getSessionMock.mockReset()
+    getSessionMock.mockResolvedValue({ data: { session: null } })
     vi.stubGlobal("fetch", fetchMock)
   })
 

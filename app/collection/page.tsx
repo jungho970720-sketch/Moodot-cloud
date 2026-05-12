@@ -7,6 +7,7 @@ import { TopAppBar } from "@/components/moodot/top-app-bar"
 import { BottomNavigation } from "@/components/moodot/bottom-navigation"
 import { CollectionCard } from "@/components/moodot/collection-card"
 import { getCollections, type CollectionSummary } from "@/lib/services/collection"
+import logger from "@/lib/logger"
 
 export default function CollectionPage() {
   const router = useRouter()
@@ -20,21 +21,21 @@ export default function CollectionPage() {
     setErrorMessage("")
     getCollections()
       .then(setCollections)
-      .catch((e) =>
+      .catch((e) => {
+        logger.error("[collection] load error:", e)
         setErrorMessage(
           e instanceof Error ? e.message : "컬렉션을 불러오지 못했습니다."
         )
-      )
+      })
       .finally(() => setIsLoading(false))
   }
 
   useEffect(() => {
     let mounted = true
-    setIsLoading(true)
-    setErrorMessage("")
     getCollections()
       .then((data) => { if (mounted) setCollections(data) })
       .catch((e) => {
+        logger.error("[collection] load error:", e)
         if (mounted)
           setErrorMessage(
             e instanceof Error ? e.message : "컬렉션을 불러오지 못했습니다."

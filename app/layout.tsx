@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from 'next'
 import { Plus_Jakarta_Sans, Manrope } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { AuthInit } from '@/components/layout/auth-init'
 import './globals.css'
+import 'leaflet/dist/leaflet.css'
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -58,6 +60,7 @@ export default function RootLayout({
         <AuthInit />
         {children}
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )

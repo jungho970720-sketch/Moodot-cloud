@@ -1,49 +1,13 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import type { LeafletMap, LeafletMarker } from "@/types/leaflet"
 import { Smile, Frown, CloudRain, Leaf, User, Users, MapPin, Pencil } from "lucide-react"
 import { getMemoryById, type MemoryRow } from "@/lib/services/memory"
+import logger from "@/lib/logger"
 import { SignedImage } from "@/components/moodot/signed-image"
 import { MemoryExportDrawer } from "@/components/moodot/memory-export-drawer"
-
-
-let leafletLoader: Promise<void> | null = null
-function loadLeafletAssets(): Promise<void> {
-  if (typeof window === "undefined") return Promise.resolve()
-  if (window.L) return Promise.resolve()
-  if (leafletLoader) return leafletLoader
-
-  leafletLoader = new Promise((resolve, reject) => {
-    if (!document.querySelector('link[data-leaflet="true"]')) {
-      const link = document.createElement("link")
-      link.rel = "stylesheet"
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      link.dataset.leaflet = "true"
-      document.head.appendChild(link)
-    }
-
-    const existing = document.querySelector('script[data-leaflet="true"]')
-    if (existing) {
-      // 이미 로딩 완료된 경우
-      if (window.L) { resolve(); return }
-      existing.addEventListener("load", () => resolve())
-      existing.addEventListener("error", () => reject(new Error("Leaflet load failed")))
-      return
-    }
-
-    const script = document.createElement("script")
-    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    script.async = true
-    script.dataset.leaflet = "true"
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error("Leaflet load failed"))
-    document.body.appendChild(script)
-  })
-  return leafletLoader
-}
-
+import { MemoryMap } from "@/components/moodot/memory-map"
 
 const EMOTION_MAP: Record<number, { icon: React.ElementType; color: string }> = {
   1: { icon: Smile,     color: "#FFE8B8" },
@@ -60,60 +24,6 @@ function formatDate(value: string | null) {
     year: "numeric", month: "long", day: "numeric",
     hour: "numeric", minute: "2-digit",
   })
-}
-
-// --- Read-only map ---
-function LocationMap({ lat, lng }: { lat: number; lng: number }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef       = useRef<LeafletMap | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-
-    const init = async () => {
-      await loadLeafletAssets()
-      if (cancelled || !containerRef.current || !window.L) return
-
-      // 이미 지도가 있으면 제거 후 재생성
-      mapRef.current?.remove()
-
-      const L = window.L
-      const map = L.map(containerRef.current, {
-        zoomControl: true,
-        dragging: false,
-        scrollWheelZoom: false,
-        doubleClickZoom: false,
-      }).setView([lat, lng], 15)
-      mapRef.current = map
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
-        maxZoom: 19,
-      }).addTo(map)
-
-      L.marker([lat, lng]).addTo(map)
-
-      // 컨테이너 크기 확정 후 타일 재계산
-      setTimeout(() => {
-        if (!cancelled) map.invalidateSize()
-      }, 100)
-    }
-
-    void init()
-
-    return () => {
-      cancelled = true
-      mapRef.current?.remove()
-      mapRef.current = null
-    }
-  }, [lat, lng])
-
-  return (
-    <div
-      ref={containerRef}
-      style={{ width: "100%", height: "208px" }}
-    />
-  )
 }
 
 // --- Main component ---
@@ -133,6 +43,7 @@ export function MemoryDetail({ id }: { id: number }) {
         setMemory(data)
       } catch (e) {
         if (!mounted) return
+        logger.error("[memory-detail] load error:", e)
         setError(e instanceof Error ? e.message : "불러오지 못했습니다.")
       } finally {
         if (mounted) setIsLoading(false)
@@ -207,7 +118,7 @@ export function MemoryDetail({ id }: { id: number }) {
       {hasLocation && (
         <section className="overflow-hidden rounded-xl shadow-[0px_4px_16px_rgba(43,52,54,0.05)]">
           <div className="bg-mb-unselected" style={{ height: "208px" }}>
-            <LocationMap lat={memory.location_lat!} lng={memory.location_lng!} />
+            <MemoryMap lat={memory.location_lat} lng={memory.location_lng} readOnly />
           </div>
           {(memory.place_name || memory.location_label) && (
             <div className="bg-mb-unselected px-4 py-3 flex items-center gap-3 border-t border-white/40">

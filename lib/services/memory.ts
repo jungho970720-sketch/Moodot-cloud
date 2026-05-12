@@ -1,4 +1,6 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import logger from "@/lib/logger"
+import type { MemoryMutationInput } from "@/lib/memory-validation"
 
 // ---------- Types ----------
 
@@ -14,33 +16,12 @@ export type MemoryRow = {
   location_label: string | null
   location_lat: number | null
   location_lng: number | null
+  processed: boolean | null
 }
 
-export type CreateMemoryInput = {
-  title: string | null
-  text: string | null
-  image_url: string | null
-  emotion_id: number
-  with_whom: string
-  memory_at: string
-  location_lat: number | null
-  location_lng: number | null
-  location_label: string | null
-  place_name: string | null
-}
+export type CreateMemoryInput = MemoryMutationInput
 
-export type UpdateMemoryInput = {
-  title: string | null
-  text: string | null
-  image_url: string | null
-  emotion_id: number
-  with_whom: string
-  memory_at: string
-  location_lat: number | null
-  location_lng: number | null
-  location_label: string | null
-  place_name: string | null
-}
+export type UpdateMemoryInput = MemoryMutationInput
 
 type ApiErrorResponse = {
   error?: string
@@ -119,10 +100,52 @@ export async function getMemories(limit?: number, offset?: number): Promise<Memo
   return requestJson<MemoryRow[]>("/api/memories")
 }
 
+const RECENT_MEMORIES_TTL_MS = 30_000
+
+type RecentCacheEntry = { data: MemoryRow[]; ts: number }
+const _recentMemoriesCache = new Map<string, RecentCacheEntry>()
+let _recentMemoriesCacheGen = 0
+
+const _recentMemoriesInflight = new Map<string, Promise<MemoryRow[]>>()
+
+export function invalidateRecentMemoriesCache(limit?: number): void {
+  _recentMemoriesCacheGen++
+  if (limit !== undefined) {
+    _recentMemoriesCache.delete(`recent:${limit}`)
+  } else {
+    _recentMemoriesCache.clear()
+    _recentMemoriesInflight.clear()
+  }
+}
+
 /** 최신 N개 (memory_at 내림차순). 에러 시 throw. */
-export async function getRecentMemories(limit: number): Promise<MemoryRow[]> {
-  const params = new URLSearchParams({ limit: String(limit) })
-  return requestJson<MemoryRow[]>(`/api/memories?${params.toString()}`)
+export function getRecentMemories(limit: number): Promise<MemoryRow[]> {
+  const cacheKey = `recent:${limit}`
+  const cached = _recentMemoriesCache.get(cacheKey)
+  if (cached && Date.now() - cached.ts < RECENT_MEMORIES_TTL_MS) {
+    return Promise.resolve(cached.data)
+  }
+
+  const url = `/api/memories?${new URLSearchParams({ limit: String(limit) })}`
+  const gen = _recentMemoriesCacheGen
+  const inflightKey = `${gen}:${url}`
+
+  const inflight = _recentMemoriesInflight.get(inflightKey)
+  if (inflight) return inflight
+
+  const promise = requestJson<MemoryRow[]>(url)
+    .then((data) => {
+      if (_recentMemoriesCacheGen === gen) {
+        _recentMemoriesCache.set(cacheKey, { data, ts: Date.now() })
+      }
+      return data
+    })
+    .finally(() => {
+      _recentMemoriesInflight.delete(inflightKey)
+    })
+
+  _recentMemoriesInflight.set(inflightKey, promise)
+  return promise
 }
 
 /** 단건 조회. 에러 시 throw. */
@@ -138,27 +161,28 @@ export async function createMemory(input: CreateMemoryInput): Promise<number> {
 
   // 세션 확인 — 없으면 익명 로그인 후 재시도
   let { data: { user } } = await supabase.auth.getUser()
-  console.log("[createMemory] getUser:", user?.id ?? "null", "| is_anonymous:", user?.is_anonymous ?? "-")
+  logger.debug("[createMemory] getUser:", user?.id ?? "null", "| is_anonymous:", user?.is_anonymous ?? "-")
 
   if (!user) {
-    console.log("[createMemory] 세션 없음 → signInAnonymously")
+    logger.debug("[createMemory] 세션 없음 → signInAnonymously")
     const { data, error: anonErr } = await supabase.auth.signInAnonymously()
     if (anonErr || !data.user) {
       console.error("[createMemory] signInAnonymously 실패:", anonErr)
       throw new Error("인증에 실패했습니다. 잠시 후 다시 시도해주세요.")
     }
     user = data.user
-    console.log("[createMemory] 익명 사용자 생성:", user.id)
+    logger.debug("[createMemory] 익명 사용자 생성:", user.id)
   }
 
   const { data: sessionData } = await supabase.auth.getSession()
-  console.log("[createMemory] access_token:", sessionData.session?.access_token ? "있음" : "없음(MISSING)")
+  logger.debug("[createMemory] access_token:", sessionData.session?.access_token ? "있음" : "없음(MISSING)")
 
   const data = await requestJson<{ id: number }>("/api/memories", {
     method: "POST",
     body: JSON.stringify(input),
   })
 
+  invalidateRecentMemoriesCache()
   return data.id
 }
 
@@ -168,6 +192,7 @@ export async function updateMemory(id: number, input: UpdateMemoryInput): Promis
     method: "PATCH",
     body: JSON.stringify(input),
   })
+  invalidateRecentMemoriesCache()
 }
 
 /** 메모리 삭제. 에러 시 throw. */
@@ -175,4 +200,5 @@ export async function deleteMemory(id: number): Promise<void> {
   await requestJson<void>(`/api/memories/${id}`, {
     method: "DELETE",
   })
+  invalidateRecentMemoriesCache()
 }

@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { getRecentMemories, type MemoryRow } from "@/lib/services/memory"
-import { getCurrentUser, subscribeToAuth } from "@/lib/supabase/auth"
+import { getRecentMemories, invalidateRecentMemoriesCache, type MemoryRow } from "@/lib/services/memory"
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import logger from "@/lib/logger"
 
 const EMOTION_COLOR_MAP: Record<number, string> = {
   1: "#FFE8B8",
@@ -72,34 +73,59 @@ export function RecentReflections() {
   useEffect(() => {
     let mounted = true
     let fetched = false
+    let fetchSeq = 0
+    const supabase = getSupabaseBrowserClient()
 
     const doFetch = async () => {
       if (fetched || !mounted) return
       fetched = true
+      const mySeq = ++fetchSeq
       try {
         const data = await getRecentMemories(2)
-        if (!mounted) return
+        if (!mounted || mySeq !== fetchSeq) return
         setMemories(data)
-      } catch {
+      } catch (e) {
+        logger.error("[recent-reflections] load error:", e)
+        fetched = false
         // 기존 동작 유지: 에러 시 빈 목록으로 처리
       } finally {
         if (mounted) setIsLoading(false)
       }
     }
 
-    // 이미 세션이 있으면 즉시 fetch
-    getCurrentUser().then((user) => {
-      if (user) void doFetch()
+    // 이미 세션이 있으면 즉시 fetch. 세션이 없으면 로딩 고착을 피한다.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return
+      if (session?.user) {
+        void doFetch()
+      } else {
+        setIsLoading(false)
+      }
     })
 
     // 세션 없을 때 AuthInit의 signInAnonymously 완료를 감지해 fetch
-    const unsubscribe = subscribeToAuth((user) => {
-      if (user) void doFetch()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        invalidateRecentMemoriesCache()
+        fetchSeq++
+        fetched = false
+        setMemories([])
+        setIsLoading(false)
+        return
+      }
+
+      if (event === "SIGNED_IN") {
+        invalidateRecentMemoriesCache()
+        fetchSeq++
+        fetched = false
+      }
+
+      if (session?.user) void doFetch()
     })
 
     return () => {
       mounted = false
-      unsubscribe()
+      subscription.unsubscribe()
     }
   }, [])
 
@@ -124,7 +150,7 @@ export function RecentReflections() {
         <p className="py-4 text-center text-sm text-mb-muted">기록이 없습니다.</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {memories.map((memory, index) => {
+          {memories.map((memory) => {
             const color = EMOTION_COLOR_MAP[memory.emotion_id ?? 1] ?? EMOTION_COLOR_MAP[1]
             const label = formatMemoryDate(memory.memory_at)
             const text = memory.text?.trim() || memory.title?.trim() || "내용 없음"

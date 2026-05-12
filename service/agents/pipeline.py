@@ -108,7 +108,8 @@ class Pipeline:
     async def process_feedback(self, payload: Dict[str, Any]) -> None:
         """피드백 INSERT 이벤트 처리 — feedback_score 갱신"""
         try:
-            record = payload.get("record", {})
+            data = payload.get("data", payload)
+            record = data.get("record") or data.get("new") or {}
             intervention_id = record.get("intervention_id")
             if not intervention_id:
                 return
