@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { vi } from "vitest"
 
@@ -111,18 +111,17 @@ describe("MemoriesListView", () => {
       makeMemory({ id: 2, title: "저녁 기록", text: "needle keyword", location_label: "제주" }),
     ])
 
-    const user = userEvent.setup()
     render(<MemoriesListView />)
 
     await screen.findByRole("heading", { name: "서울 산책" })
 
     const searchInput = screen.getByPlaceholderText("Search your memories...")
 
-    await user.type(searchInput, "부산")
+    fireEvent.change(searchInput, { target: { value: "부산" } })
     expect(screen.getByText("표시할 메모리가 없습니다.")).toBeInTheDocument()
 
-    await user.clear(searchInput)
-    await user.type(searchInput, "needle")
+    fireEvent.change(searchInput, { target: { value: "" } })
+    fireEvent.change(searchInput, { target: { value: "needle" } })
 
     expect(screen.getByRole("heading", { name: "저녁 기록" })).toBeInTheDocument()
     expect(screen.queryByRole("heading", { name: "서울 산책" })).not.toBeInTheDocument()

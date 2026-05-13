@@ -3,7 +3,7 @@ import "server-only"
 import { decryptMemoryText, type MemoryTextRecord } from "@/lib/server/memory-text-crypto"
 
 export const MEMORY_SELECT_COLUMNS =
-  "id,title,text,text_ciphertext,text_iv,text_key_version,image_url,emotion_id,with_whom,memory_at,place_name,location_label,location_lat,location_lng"
+  "id,title,text,text_ciphertext,text_iv,text_key_version,image_url,emotion_id,with_whom,memory_at,place_name,location_label,location_lat,location_lng,processed"
 
 export type MemoryDbRow = MemoryTextRecord & {
   id: number
@@ -16,6 +16,7 @@ export type MemoryDbRow = MemoryTextRecord & {
   location_label: string | null
   location_lat: number | null
   location_lng: number | null
+  processed: boolean | null
 }
 
 export type MemoryTextDbRow = MemoryTextRecord & {
@@ -35,6 +36,7 @@ export function toPublicMemoryRow(row: MemoryDbRow) {
     location_label: row.location_label,
     location_lat: row.location_lat,
     location_lng: row.location_lng,
+    processed: row.processed ?? null,
   }
 }
 

@@ -51,8 +51,8 @@ export function MemoryExportDrawer({ memory }: MemoryExportDrawerProps) {
       </Drawer.Trigger>
 
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
-        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-[375px] outline-none">
+        <Drawer.Overlay className="fixed inset-0 z-[1200] bg-black/40" />
+        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[1210] mx-auto max-w-[375px] outline-none">
           <div className="rounded-t-2xl bg-mb-bg px-5 pb-8 pt-4">
             {/* 손잡이 */}
             <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-mb-unselected" />

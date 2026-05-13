@@ -16,10 +16,10 @@ export interface CalendarMoodRecord {
 }
 
 const moodConfig: Record<MoodType, { color: string; iconColor: string; icon: LucideIcon; label: string }> = {
-  good:  { color: "bg-[#FFE8B8]", iconColor: "#374151", icon: Smile,    label: "Good" },
-  bad:   { color: "bg-[#F8C8C8]", iconColor: "#374151", icon: Frown,    label: "Bad"  },
-  sad:   { color: "bg-[#B0E4F8]", iconColor: "#374151", icon: CloudRain, label: "Sad" },
-  calm:  { color: "bg-[#C0ECD8]", iconColor: "#374151", icon: Leaf,     label: "Calm" },
+  good:  { color: "bg-[#FFE8B8]", iconColor: "#374151", icon: Smile,     label: "Good" },
+  bad:   { color: "bg-[#F8C8C8]", iconColor: "#374151", icon: Frown,     label: "Bad"  },
+  sad:   { color: "bg-[#B0E4F8]", iconColor: "#374151", icon: CloudRain, label: "Sad"  },
+  calm:  { color: "bg-[#C0ECD8]", iconColor: "#374151", icon: Leaf,      label: "Calm" },
 }
 
 const DAYS = ["일", "월", "화", "수", "목", "금", "토"]
@@ -50,7 +50,6 @@ export function CalendarView({ records }: CalendarViewProps) {
       .filter((record) => record.date === dateStr)
       .sort((a, b) => {
         if (!a.memoryAt || !b.memoryAt) return b.id - a.id
-
         return new Date(b.memoryAt).getTime() - new Date(a.memoryAt).getTime()
       })
 
@@ -60,17 +59,13 @@ export function CalendarView({ records }: CalendarViewProps) {
       setExpandedDate(null)
       return
     }
-
     setSelectedDate(null)
     setExpandedDate(null)
   }
 
   const handleRecordCardClick = () => {
     if (!selectedDate || selectedRecords.length <= 1) return
-
-    setExpandedDate((currentExpandedDate) =>
-      currentExpandedDate === selectedDate ? null : selectedDate
-    )
+    setExpandedDate((prev) => (prev === selectedDate ? null : selectedDate))
   }
 
   const handlePrevMonth = () => {
@@ -102,7 +97,6 @@ export function CalendarView({ records }: CalendarViewProps) {
   const visibleSelectedRecords = isExpanded ? selectedRecords : selectedRecords.slice(0, 1)
   const hasCurrentMonthRecords = records.some((record) => {
     const [recordYear, recordMonth] = record.date.split("-")
-
     return (
       Number(recordYear) === currentYear &&
       Number(recordMonth) === currentMonth + 1
@@ -111,24 +105,17 @@ export function CalendarView({ records }: CalendarViewProps) {
 
   return (
     <section className="pt-6">
-      {/* 헤더 */}
       <div className="flex items-center justify-between mb-4">
-        <Button
-          variant="ghost"
-          size="icon"
+        <Button variant="ghost" size="icon"
           className="h-9 w-9 rounded-full bg-mb-unselected hover:bg-mb-accent-mint/40"
           onClick={handlePrevMonth}
         >
           <ChevronLeft className="h-4 w-4 text-mb-dark" />
         </Button>
-
         <h2 className="font-heading font-semibold text-mb-dark text-lg">
           {currentYear}년 {currentMonth + 1}월
         </h2>
-
-        <Button
-          variant="ghost"
-          size="icon"
+        <Button variant="ghost" size="icon"
           className="h-9 w-9 rounded-full bg-mb-unselected hover:bg-mb-accent-mint/40"
           onClick={handleNextMonth}
         >
@@ -136,27 +123,19 @@ export function CalendarView({ records }: CalendarViewProps) {
         </Button>
       </div>
 
-      {/* 요일 헤더 */}
       <div className="grid grid-cols-7 mb-2">
         {DAYS.map((day) => (
-          <div
-            key={day}
-            className="text-center text-xs font-semibold text-mb-muted py-1"
-          >
+          <div key={day} className="text-center text-xs font-semibold text-mb-muted py-1">
             {day}
           </div>
         ))}
       </div>
 
-      {/* 날짜 그리드 */}
       <div className="bg-white rounded-2xl shadow-sm shadow-mb-dark/5 p-3">
         <div className="grid grid-cols-7 gap-1">
-          {/* 빈 칸 */}
           {Array.from({ length: firstDay }).map((_, i) => (
             <div key={`empty-${i}`} />
           ))}
-
-          {/* 날짜 */}
           {Array.from({ length: daysInMonth }).map((_, i) => {
             const day = i + 1
             const dateStr = formatDate(currentYear, currentMonth, day)
@@ -186,9 +165,7 @@ export function CalendarView({ records }: CalendarViewProps) {
                 <span>{day}</span>
                 {latestRecord && !isSelected && (
                   <span className="relative mt-0.5">
-                    <span
-                      className={`block h-4 w-4 rounded-md ${moodConfig[latestRecord.mood].color}`}
-                    />
+                    <span className={`block h-4 w-4 rounded-md ${moodConfig[latestRecord.mood].color}`} />
                     {dateRecords.length > 1 && (
                       <span className="absolute -right-1 -top-1 h-3 min-w-3 rounded-full bg-mb-primary px-0.5 text-[8px] leading-3 text-white">
                         {dateRecords.length}
@@ -208,7 +185,6 @@ export function CalendarView({ records }: CalendarViewProps) {
         </p>
       )}
 
-      {/* 무드 범례 */}
       <div className="flex justify-center gap-4 mt-4">
         {Object.entries(moodConfig).map(([key, val]) => {
           const Icon = val.icon
@@ -223,7 +199,6 @@ export function CalendarView({ records }: CalendarViewProps) {
         })}
       </div>
 
-      {/* 선택된 날짜 기록 */}
       {selectedDate && (
         <div className="mt-4 bg-white rounded-2xl shadow-sm shadow-mb-dark/5 p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <p className="text-sm font-semibold text-mb-dark mb-2">
@@ -232,52 +207,38 @@ export function CalendarView({ records }: CalendarViewProps) {
           {selectedRecords.length > 0 ? (
             <div className="space-y-2">
               {visibleSelectedRecords.map((record, index) => {
-                const canExpandFromCard = !isExpanded && index === 0 && selectedRecords.length > 1
-                const actionLabel = canExpandFromCard ? "펼쳐보기" : "상세 보기"
-                const handleRecordAction = () => {
-                  if (canExpandFromCard) {
-                    handleRecordCardClick()
-                    return
-                  }
-
+                const canExpand = !isExpanded && index === 0 && selectedRecords.length > 1
+                const actionLabel = canExpand ? "펼쳐보기" : "상세 보기"
+                const handleAction = () => {
+                  if (canExpand) { handleRecordCardClick(); return }
                   router.push(`/memory/${record.id}`)
                 }
-
                 return (
-                <button
-                  key={record.id}
-                  type="button"
-                  onClick={handleRecordAction}
-                  className="flex w-full cursor-pointer items-start gap-3 rounded-xl text-left transition-colors hover:bg-mb-unselected/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-mb-primary focus-visible:ring-offset-2"
-                >
-                  {(() => {
-                    const Icon = moodConfig[record.mood].icon
-                    return (
-                      <span
-                        className={`
-                          h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0
-                          ${moodConfig[record.mood].color}
-                        `}
-                      >
-                        <Icon className="h-5 w-5" style={{ color: moodConfig[record.mood].iconColor }} />
-                      </span>
-                    )
-                  })()}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold text-mb-dark">
-                        {moodConfig[record.mood].label}
-                      </p>
-                      <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-mb-primary">
-                        {actionLabel}
-                        <ArrowRight className="h-3 w-3" />
-                      </span>
+                  <button
+                    key={record.id}
+                    type="button"
+                    onClick={handleAction}
+                    className="flex w-full cursor-pointer items-start gap-3 rounded-xl text-left transition-colors hover:bg-mb-unselected/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-mb-primary focus-visible:ring-offset-2"
+                  >
+                    {(() => {
+                      const Icon = moodConfig[record.mood].icon
+                      return (
+                        <span className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${moodConfig[record.mood].color}`}>
+                          <Icon className="h-5 w-5" style={{ color: moodConfig[record.mood].iconColor }} />
+                        </span>
+                      )
+                    })()}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-mb-dark">{moodConfig[record.mood].label}</p>
+                        <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-mb-primary">
+                          {actionLabel}
+                          <ArrowRight className="h-3 w-3" />
+                        </span>
+                      </div>
+                      {record.note && <p className="text-xs text-mb-muted mt-1">{record.note}</p>}
                     </div>
-                    {record.note && (
-                      <p className="text-xs text-mb-muted mt-1">{record.note}</p>
-                    )}
-                  </div>
-                </button>
+                  </button>
                 )
               })}
             </div>
