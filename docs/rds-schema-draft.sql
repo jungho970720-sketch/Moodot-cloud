@@ -3,6 +3,10 @@
 -- This is a draft based on the current backend/worker code.
 -- Before applying it to RDS, compare it with the real Supabase
 -- schema exported from information_schema.
+--
+-- Note: Supabase has foreign keys to auth.users(id). RDS will not
+-- have Supabase auth.users, because Cognito is the new auth source.
+-- Keep user_id as the Cognito sub value and enforce ownership in the app.
 
 create extension if not exists pgcrypto;
 create extension if not exists "uuid-ossp";
@@ -44,7 +48,9 @@ create table if not exists public.collections (
   cover_memory_id bigint references public.memories(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  user_id uuid not null
+  user_id uuid not null,
+  constraint collections_title_check
+    check (length(trim(title)) >= 1)
 );
 
 create table if not exists public.collection_memories (
@@ -52,7 +58,9 @@ create table if not exists public.collection_memories (
   collection_id uuid not null references public.collections(id) on delete cascade,
   memory_id bigint not null references public.memories(id) on delete cascade,
   position integer not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint collection_memories_collection_id_memory_id_key
+    unique (collection_id, memory_id)
 );
 
 create table if not exists public.interventions (
@@ -78,7 +86,7 @@ create table if not exists public.intervention_feedback (
   response_time_sec integer,
   created_at timestamptz default now(),
   constraint intervention_feedback_explicit_score_check
-    check (explicit_score in (2, -2))
+    check (explicit_score in (-2, 0, 2))
 );
 
 create or replace function public.set_updated_at()

@@ -72,6 +72,7 @@ Supabase Storage는 `memory-images` 버킷을 사용한다. 이 부분은 RDS가
 1. `memories`
    - 기록 저장/조회가 앱의 핵심 기능이다.
    - Cognito `sub` 값을 `user_id`로 저장하는 기준을 먼저 확정한다.
+   - Supabase의 `auth.users(id)` 외래키는 RDS에 그대로 옮기지 않는다. Cognito를 인증 원천으로 쓰기 때문이다.
 2. `collections`, `collection_memories`
    - 기록 묶음 기능이다.
    - `memories`가 먼저 옮겨져야 안전하다.
