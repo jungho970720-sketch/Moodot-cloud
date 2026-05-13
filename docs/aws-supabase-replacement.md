@@ -86,6 +86,7 @@ Supabase Storage는 `memory-images` 버킷을 사용한다. 이 부분은 RDS가
 
 1. Supabase에서 현재 테이블 구조를 확인한다.
    - Supabase SQL Editor에서 `memories`, `collections`, `collection_memories`, `interventions`, `intervention_feedback`, `emotion_categories`의 컬럼/타입을 확인한다.
+   - RDS 초안은 `docs/rds-schema-draft.sql`에 있다. 실제 Supabase 구조와 비교 후 보정한다.
 2. RDS PostgreSQL을 만든다.
    - 처음에는 Free tier 또는 가장 작은 인스턴스로 시작한다.
    - EC2 백엔드에서 접근할 수 있도록 같은 VPC/보안그룹을 맞춘다.
