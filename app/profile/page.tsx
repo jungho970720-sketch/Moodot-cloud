@@ -13,11 +13,11 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { subscribeToAuth, signOut } from "@/lib/supabase/auth"
-import type { User } from "@supabase/supabase-js"
+import type { AppUser } from "@/lib/supabase/auth"
 import logger from "@/lib/logger"
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<User | null | undefined>(undefined)
+  const [user, setUser] = useState<AppUser | null | undefined>(undefined)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState(false)
   const router = useRouter()

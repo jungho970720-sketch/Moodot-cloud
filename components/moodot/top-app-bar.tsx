@@ -6,10 +6,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { subscribeToAuth } from "@/lib/supabase/auth"
-import type { User } from "@supabase/supabase-js"
+import type { AppUser } from "@/lib/supabase/auth"
 
 function AuthAvatar() {
-  const [user, setUser] = useState<User | null | undefined>(undefined)
+  const [user, setUser] = useState<AppUser | null | undefined>(undefined)
   const router = useRouter()
 
   useEffect(() => {

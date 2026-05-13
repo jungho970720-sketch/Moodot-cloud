@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getAccessToken, getCurrentUser, signInAnonymously } from "@/lib/supabase/auth"
 
 const BUCKET = "memory-images"
 const TTL_SECONDS = 3600
@@ -14,27 +14,19 @@ function getApiUrl(path: string) {
 }
 
 async function ensureAccessToken() {
-  const supabase = getSupabaseBrowserClient()
+  let token = await getAccessToken()
 
-  let {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.access_token) {
-    const { error } = await supabase.auth.signInAnonymously()
-    if (error) {
-      throw error
-    }
-
-    const result = await supabase.auth.getSession()
-    session = result.data.session
+  if (!token) {
+    await signInAnonymously()
+    const user = await getCurrentUser()
+    token = user ? await getAccessToken() : null
   }
 
-  if (!session?.access_token) {
+  if (!token) {
     throw new Error("인증에 실패했습니다.")
   }
 
-  return session.access_token
+  return token
 }
 
 async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {

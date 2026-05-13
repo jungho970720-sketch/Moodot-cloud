@@ -7,11 +7,11 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { subscribeToAuth, signInWithGoogle } from "@/lib/supabase/auth"
-import type { User } from "@supabase/supabase-js"
+import type { AppUser } from "@/lib/supabase/auth"
 import logger from "@/lib/logger"
 
 export default function LoginPage() {
-  const [user, setUser] = useState<User | null | undefined>(undefined)
+  const [user, setUser] = useState<AppUser | null | undefined>(undefined)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 

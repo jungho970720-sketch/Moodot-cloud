@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getAccessToken, getCurrentUser, signInAnonymously } from "@/lib/supabase/auth"
 import type { MemoryRow } from "./memory"
 
 export type CoverMemory = { image_url: string | null } | null
@@ -47,17 +47,14 @@ function getApiUrl(path: string) {
 }
 
 async function getAuthHeaders() {
-  const supabase = getSupabaseBrowserClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const accessToken = await getAccessToken()
 
-  if (!session?.access_token) {
+  if (!accessToken) {
     return {}
   }
 
   return {
-    Authorization: `Bearer ${session.access_token}`,
+    Authorization: `Bearer ${accessToken}`,
   }
 }
 
@@ -120,14 +117,12 @@ export async function getAvailableMemories(currentCollectionId?: string): Promis
 }
 
 export async function createCollection(input: CollectionFormInput): Promise<string> {
-  const supabase = getSupabaseBrowserClient()
-  let {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = await getCurrentUser()
 
   if (!user) {
-    const { data, error } = await supabase.auth.signInAnonymously()
-    if (error || !data.user) {
+    await signInAnonymously()
+    user = await getCurrentUser()
+    if (!user) {
       throw new Error("인증에 실패했습니다.")
     }
   }

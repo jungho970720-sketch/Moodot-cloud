@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { getRecentMemories, invalidateRecentMemoriesCache, type MemoryRow } from "@/lib/services/memory"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { subscribeToAuth } from "@/lib/supabase/auth"
 import logger from "@/lib/logger"
 
 const EMOTION_COLOR_MAP: Record<number, string> = {
@@ -74,7 +74,6 @@ export function RecentReflections() {
     let mounted = true
     let fetched = false
     let fetchSeq = 0
-    const supabase = getSupabaseBrowserClient()
 
     const doFetch = async () => {
       if (fetched || !mounted) return
@@ -93,19 +92,10 @@ export function RecentReflections() {
       }
     }
 
-    // 이미 세션이 있으면 즉시 fetch. 세션이 없으면 로딩 고착을 피한다.
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const unsubscribe = subscribeToAuth((user) => {
       if (!mounted) return
-      if (session?.user) {
-        void doFetch()
-      } else {
-        setIsLoading(false)
-      }
-    })
 
-    // 세션 없을 때 AuthInit의 signInAnonymously 완료를 감지해 fetch
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT") {
+      if (!user) {
         invalidateRecentMemoriesCache()
         fetchSeq++
         fetched = false
@@ -114,18 +104,12 @@ export function RecentReflections() {
         return
       }
 
-      if (event === "SIGNED_IN") {
-        invalidateRecentMemoriesCache()
-        fetchSeq++
-        fetched = false
-      }
-
-      if (session?.user) void doFetch()
+      void doFetch()
     })
 
     return () => {
       mounted = false
-      subscription.unsubscribe()
+      unsubscribe()
     }
   }, [])
 

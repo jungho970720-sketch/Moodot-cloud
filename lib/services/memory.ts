@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getAccessToken, getCurrentUser, signInAnonymously } from "@/lib/supabase/auth"
 import logger from "@/lib/logger"
 import type { MemoryMutationInput } from "@/lib/memory-validation"
 
@@ -33,17 +33,14 @@ function getApiUrl(path: string) {
 }
 
 async function getAuthHeaders() {
-  const supabase = getSupabaseBrowserClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const accessToken = await getAccessToken()
 
-  if (!session?.access_token) {
+  if (!accessToken) {
     return {}
   }
 
   return {
-    Authorization: `Bearer ${session.access_token}`,
+    Authorization: `Bearer ${accessToken}`,
   }
 }
 
@@ -157,25 +154,23 @@ export async function getMemoryById(id: number): Promise<MemoryRow> {
 
 /** 새 메모리 생성. 에러 시 throw. */
 export async function createMemory(input: CreateMemoryInput): Promise<number> {
-  const supabase = getSupabaseBrowserClient()
-
   // 세션 확인 — 없으면 익명 로그인 후 재시도
-  let { data: { user } } = await supabase.auth.getUser()
+  let user = await getCurrentUser()
   logger.debug("[createMemory] getUser:", user?.id ?? "null", "| is_anonymous:", user?.is_anonymous ?? "-")
 
   if (!user) {
     logger.debug("[createMemory] 세션 없음 → signInAnonymously")
-    const { data, error: anonErr } = await supabase.auth.signInAnonymously()
-    if (anonErr || !data.user) {
-      console.error("[createMemory] signInAnonymously 실패:", anonErr)
+    await signInAnonymously()
+    user = await getCurrentUser()
+    if (!user) {
+      console.error("[createMemory] signInAnonymously 실패")
       throw new Error("인증에 실패했습니다. 잠시 후 다시 시도해주세요.")
     }
-    user = data.user
     logger.debug("[createMemory] 익명 사용자 생성:", user.id)
   }
 
-  const { data: sessionData } = await supabase.auth.getSession()
-  logger.debug("[createMemory] access_token:", sessionData.session?.access_token ? "있음" : "없음(MISSING)")
+  const accessToken = await getAccessToken()
+  logger.debug("[createMemory] access_token:", accessToken ? "있음" : "없음(MISSING)")
 
   const data = await requestJson<{ id: number }>("/api/memories", {
     method: "POST",

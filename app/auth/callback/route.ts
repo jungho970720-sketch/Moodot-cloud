@@ -3,6 +3,49 @@ import { NextRequest, NextResponse } from "next/server"
 
 import logger from "@/lib/logger"
 
+type CognitoTokenResponse = {
+  access_token?: string
+  id_token?: string
+  refresh_token?: string
+  expires_in?: number
+}
+
+function isCognitoAuth() {
+  return process.env.NEXT_PUBLIC_AUTH_PROVIDER === "cognito"
+}
+
+function getCognitoDomain() {
+  return process.env.COGNITO_DOMAIN ?? process.env.NEXT_PUBLIC_COGNITO_DOMAIN
+}
+
+async function exchangeCognitoCode(code: string, redirectUri: string) {
+  const domain = getCognitoDomain()
+  const clientId = process.env.COGNITO_CLIENT_ID ?? process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID
+
+  if (!domain || !clientId) {
+    throw new Error("Cognito callback environment variables are missing.")
+  }
+
+  const response = await fetch(`${domain.replace(/\/$/, "")}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: clientId,
+      code,
+      redirect_uri: redirectUri,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Cognito token exchange failed. (${response.status})`)
+  }
+
+  return (await response.json()) as CognitoTokenResponse
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get("code")
@@ -22,6 +65,38 @@ export async function GET(request: NextRequest) {
   const response = NextResponse.redirect(new URL("/", publicOrigin))
 
   if (code) {
+    if (isCognitoAuth()) {
+      try {
+        const tokens = await exchangeCognitoCode(code, `${publicOrigin}/auth/callback`)
+        const maxAge = tokens.expires_in ?? 3600
+        const cookieOptions = {
+          path: "/",
+          maxAge,
+          sameSite: "lax" as const,
+          secure: proto === "https",
+        }
+
+        if (tokens.access_token) {
+          response.cookies.set("moodot_cognito_access_token", tokens.access_token, cookieOptions)
+        }
+        if (tokens.id_token) {
+          response.cookies.set("moodot_cognito_id_token", tokens.id_token, cookieOptions)
+        }
+        if (tokens.refresh_token) {
+          response.cookies.set("moodot_cognito_refresh_token", tokens.refresh_token, {
+            ...cookieOptions,
+            maxAge: 60 * 60 * 24 * 30,
+          })
+        }
+
+        logger.info("[auth/callback] Cognito token exchange 완료")
+      } catch (error) {
+        logger.error("[auth/callback] Cognito token exchange error:", error)
+      }
+
+      return response
+    }
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??

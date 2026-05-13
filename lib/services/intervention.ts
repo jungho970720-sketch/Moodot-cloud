@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getAccessToken } from "@/lib/supabase/auth"
 
 export type Intervention = {
   id: number
@@ -25,17 +25,14 @@ function getApiUrl(path: string) {
 }
 
 async function getAuthHeaders() {
-  const supabase = getSupabaseBrowserClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const accessToken = await getAccessToken()
 
-  if (!session?.access_token) {
+  if (!accessToken) {
     return {}
   }
 
   return {
-    Authorization: `Bearer ${session.access_token}`,
+    Authorization: `Bearer ${accessToken}`,
   }
 }
 
