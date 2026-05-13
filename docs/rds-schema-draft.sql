@@ -107,20 +107,27 @@ create trigger collections_updated_at
   before update on public.collections
   for each row execute function public.set_updated_at();
 
-create index if not exists idx_memories_user_memory_at
+create index if not exists idx_memories_user_memory_at_desc
   on public.memories(user_id, memory_at desc);
 
-create index if not exists idx_memories_user_created
-  on public.memories(user_id, created_at desc);
+create index if not exists idx_memories_unprocessed
+  on public.memories(created_at desc)
+  where processed = false;
 
 create index if not exists idx_collections_user_created
   on public.collections(user_id, created_at desc);
 
+create index if not exists idx_collection_memories_collection_id
+  on public.collection_memories(collection_id);
+
 create index if not exists idx_collection_memories_memory_id
   on public.collection_memories(memory_id);
 
-create index if not exists idx_interventions_user_pending_created
-  on public.interventions(user_id, created_at desc)
+create index if not exists idx_interventions_created_at
+  on public.interventions(created_at desc);
+
+create index if not exists idx_interventions_pending
+  on public.interventions(created_at desc)
   where status = 'pending';
 
 create index if not exists idx_intervention_feedback_intervention_id
