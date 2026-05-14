@@ -16,6 +16,15 @@ create table if not exists public.emotion_categories (
   emotion varchar not null unique
 );
 
+insert into public.emotion_categories (emotion_id, emotion)
+values
+  (1, 'good'),
+  (2, 'bad'),
+  (3, 'sad'),
+  (4, 'calm')
+on conflict (emotion_id) do update
+set emotion = excluded.emotion;
+
 create table if not exists public.memories (
   id bigserial primary key,
   user_id uuid not null,

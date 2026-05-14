@@ -9,7 +9,7 @@ export type MemoryDbRow = MemoryTextRecord & {
   image_url: string | null
   emotion_id: number | null
   with_whom: string | null
-  memory_at: string | null
+  memory_at: string | Date | null
   place_name: string | null
   location_label: string | null
   location_lat: number | null
@@ -28,7 +28,7 @@ export function toPublicMemoryRow(row: MemoryDbRow) {
     image_url: row.image_url,
     emotion_id: row.emotion_id,
     with_whom: row.with_whom,
-    memory_at: row.memory_at,
+    memory_at: row.memory_at instanceof Date ? row.memory_at.toISOString() : row.memory_at,
     place_name: row.place_name,
     location_label: row.location_label,
     location_lat: row.location_lat,
