@@ -38,7 +38,7 @@ function AuthAvatar() {
   }
 
   // 로그인 상태
-  const initial = (user.email ?? user.user_metadata?.name ?? "?")
+  const initial = (user.email ?? user.user_metadata?.name ?? "G")
     .charAt(0)
     .toUpperCase()
 

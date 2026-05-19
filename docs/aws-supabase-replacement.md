@@ -2,14 +2,30 @@
 
 Moodot의 Supabase 의존성은 한 번에 제거하지 않고 단계적으로 줄인다.
 
-## 현재 1단계
+## 현재 상태
+
+- 배포 도메인 `https://mood-ot.com`을 Route 53과 Nginx HTTPS로 연결했다.
+- Cognito Hosted UI와 Google 로그인을 연결했다.
+- Cognito App Client는 secret 없는 SPA 클라이언트를 사용한다.
+- EC2에서는 PM2로 `moodot-fe`, `moodot-be`를 실행한다.
+- `memories` 저장/조회는 RDS PostgreSQL의 `public.memories` 테이블까지 검증했다.
+- RDS 저장 확인은 EC2에서 SQL 조회로 확인한다.
+
+```sql
+select id, user_id, title, created_at
+from public.memories
+order by created_at desc
+limit 5;
+```
+
+## 기존 1단계 기록
 
 - Auth는 `NEXT_PUBLIC_AUTH_PROVIDER` 값으로 `supabase` 또는 `cognito`를 선택한다.
 - `supabase`일 때는 기존 Supabase Auth 흐름을 그대로 사용한다.
 - `cognito`일 때는 AWS Cognito Hosted UI로 Google 로그인을 진행하고, `/auth/callback`에서 토큰을 쿠키에 저장한다.
-- 백엔드는 Cognito JWT를 검증한 뒤, 임시 호환 모드로 Supabase DB를 service key로 조회한다.
+- 백엔드는 Cognito JWT를 검증한 뒤, PostgreSQL 환경변수가 있으면 RDS를 사용한다.
 
-즉, 이 단계는 “로그인 입구를 AWS Cognito로 바꾸는 작업”이고 DB와 Storage는 아직 Supabase에 남아 있다.
+즉, 이 단계는 “로그인 입구를 AWS Cognito로 바꾸고, 핵심 기록 저장을 RDS로 옮기는 작업”이다. Storage와 AI Worker 쪽 의존성은 아직 별도 전환 대상이다.
 
 ## AWS 콘솔에서 필요한 Cognito 설정
 
@@ -22,11 +38,10 @@ Moodot의 Supabase 의존성은 한 번에 제거하지 않고 단계적으로 �
 4. Google identity provider 연결
 5. Callback URL 등록
    - 로컬: `http://localhost:3000/auth/callback`
-   - EC2: `http://Elastic-IP:3000/auth/callback`
-   - 나중에 도메인을 붙이면 `https://도메인/auth/callback`
+   - 배포: `https://mood-ot.com/auth/callback`
 6. Sign-out URL 등록
    - 로컬: `http://localhost:3000/login`
-   - EC2: `http://Elastic-IP:3000/login`
+   - 배포: `https://mood-ot.com/login`
 
 ## 로컬 또는 EC2 환경변수
 
@@ -43,7 +58,17 @@ COGNITO_USER_POOL_ID=ap-northeast-2_xxxxxxxxx
 
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url-here
 SUPABASE_SERVICE_KEY=your-supabase-service-key-here
+
+DB_HOST=database-1.cne0o00q014x.ap-northeast-2.rds.amazonaws.com
+DB_PORT=5432
+DB_NAME=postgres
+DB_USER=postgres
+DB_PASSWORD=your-rds-password
+DATABASE_SSL=true
+FRONTEND_ORIGIN=https://mood-ot.com,http://localhost:3000
 ```
+
+배포 환경에서는 `NEXT_PUBLIC_API_BASE_URL=https://mood-ot.com`으로 두고, Nginx가 `/api/` 요청을 백엔드 `127.0.0.1:4000`으로 프록시한다.
 
 ## 다음 단계
 

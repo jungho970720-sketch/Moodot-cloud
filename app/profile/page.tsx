@@ -27,8 +27,12 @@ export default function ProfilePage() {
   }, [])
 
   const isSignedIn = Boolean(user && !user.is_anonymous)
-  const displayName = user?.user_metadata?.name ?? user?.email?.split("@")[0] ?? "게스트"
-  const avatarFallback = displayName.charAt(0).toUpperCase() || "G"
+  const displayName = isSignedIn
+    ? user?.user_metadata?.name ?? user?.email?.split("@")[0] ?? "Google 사용자"
+    : "게스트"
+  const avatarFallback = isSignedIn && !user?.user_metadata?.name && !user?.email
+    ? "G"
+    : displayName.charAt(0).toUpperCase() || "G"
   const accountLabel = isSignedIn ? "Google 계정 연결됨" : "게스트 모드"
   const avatarUrl = user?.user_metadata?.avatar_url
 

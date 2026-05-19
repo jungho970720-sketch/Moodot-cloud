@@ -22,10 +22,10 @@ The main FE/BE split has already been applied to these domains:
 - `ai-insight` state lookup
 - image upload / signed URL flow
 
-The app now follows this primary request flow:
+The app now follows this primary request flow in the EC2 practice deployment:
 
 ```text
-Frontend -> Backend API -> Supabase
+Browser -> Nginx HTTPS -> Next.js frontend -> Express backend -> RDS PostgreSQL
 ```
 
 ## Local development
@@ -71,6 +71,14 @@ SUPABASE_SERVICE_ROLE_KEY=
 MEMORY_TEXT_ENCRYPTION_KEY=
 NEXT_PUBLIC_API_BASE_URL=
 FRONTEND_ORIGIN=
+NEXT_PUBLIC_AUTH_PROVIDER=
+AUTH_PROVIDER=
+NEXT_PUBLIC_COGNITO_DOMAIN=
+NEXT_PUBLIC_COGNITO_CLIENT_ID=
+COGNITO_DOMAIN=
+COGNITO_CLIENT_ID=
+COGNITO_REGION=
+COGNITO_USER_POOL_ID=
 ```
 
 See [docs/architecture.md](/Users/jungho/Moodot-cloud/docs/architecture.md) for
@@ -78,10 +86,27 @@ more detail on how these are used.
 
 ## Deployment notes
 
-- Frontend process name: `moodot`
-- Backend process name: `moodot-backend`
-- PM2 auto-start has been configured for EC2 runtime recovery
-- Elastic IP is used to keep the public address stable across restarts
+- Current practice domain: `https://mood-ot.com`
+- Frontend process name: `moodot-fe`
+- Backend process name: `moodot-be`
+- PM2 process list should be saved with `pm2 save` after restart changes.
+- Elastic IP is used to keep the public address stable across restarts.
+
+Typical EC2 deployment check:
+
+```bash
+cd ~/Moodot-cloud
+npm run build
+pm2 restart moodot-fe --update-env
+
+cd ~/Moodot-cloud/backend
+npm run build
+pm2 restart moodot-be --update-env
+
+curl -I https://mood-ot.com
+curl https://mood-ot.com/health
+pm2 save
+```
 
 ## Project docs
 
