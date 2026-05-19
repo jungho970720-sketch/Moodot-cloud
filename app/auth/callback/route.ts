@@ -21,9 +21,21 @@ function getCognitoDomain() {
 async function exchangeCognitoCode(code: string, redirectUri: string) {
   const domain = getCognitoDomain()
   const clientId = process.env.COGNITO_CLIENT_ID ?? process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID
+  const clientSecret = process.env.COGNITO_CLIENT_SECRET
 
   if (!domain || !clientId) {
     throw new Error("Cognito callback environment variables are missing.")
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: clientId,
+    code,
+    redirect_uri: redirectUri,
+  })
+
+  if (clientSecret) {
+    body.set("client_secret", clientSecret)
   }
 
   const response = await fetch(`${domain.replace(/\/$/, "")}/oauth2/token`, {
@@ -31,16 +43,12 @@ async function exchangeCognitoCode(code: string, redirectUri: string) {
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: clientId,
-      code,
-      redirect_uri: redirectUri,
-    }),
+    body,
   })
 
   if (!response.ok) {
-    throw new Error(`Cognito token exchange failed. (${response.status})`)
+    const message = await response.text().catch(() => "")
+    throw new Error(`Cognito token exchange failed. (${response.status}) ${message}`)
   }
 
   return (await response.json()) as CognitoTokenResponse
@@ -49,6 +57,8 @@ async function exchangeCognitoCode(code: string, redirectUri: string) {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get("code")
+  const error = searchParams.get("error")
+  const errorDescription = searchParams.get("error_description")
 
   // EC2/standalone 환경에서 request.url origin이 내부 바인딩 주소(0.0.0.0:3000)로
   // 잡히는 문제를 피하기 위해 요청 헤더의 x-forwarded-host / host 기준으로 origin을 계산한다.
@@ -64,8 +74,18 @@ export async function GET(request: NextRequest) {
   // cookies() / cookieStore.set() 패턴은 NextResponse에 쿠키를 포함시키지 않는다.
   const response = NextResponse.redirect(new URL("/", publicOrigin))
 
-  if (code) {
-    if (isCognitoAuth()) {
+  if (isCognitoAuth()) {
+    if (error) {
+      logger.error("[auth/callback] Cognito authorization error:", error, errorDescription)
+      const loginUrl = new URL("/login", publicOrigin)
+      loginUrl.searchParams.set("auth_error", error)
+      if (errorDescription) {
+        loginUrl.searchParams.set("auth_error_description", errorDescription)
+      }
+      return NextResponse.redirect(loginUrl)
+    }
+
+    if (code) {
       try {
         const tokens = await exchangeCognitoCode(code, `${publicOrigin}/auth/callback`)
         const maxAge = tokens.expires_in ?? 3600
@@ -92,11 +112,16 @@ export async function GET(request: NextRequest) {
         logger.info("[auth/callback] Cognito token exchange 완료")
       } catch (error) {
         logger.error("[auth/callback] Cognito token exchange error:", error)
+        const loginUrl = new URL("/login", publicOrigin)
+        loginUrl.searchParams.set("auth_error", "token_exchange_failed")
+        return NextResponse.redirect(loginUrl)
       }
 
       return response
     }
+  }
 
+  if (code) {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??

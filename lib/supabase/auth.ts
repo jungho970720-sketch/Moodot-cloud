@@ -17,6 +17,7 @@ type CognitoJwtPayload = {
   email?: string
   name?: string
   picture?: string
+  exp?: number
 }
 
 function getApiUrl(path: string) {
@@ -64,12 +65,26 @@ function decodeJwtPayload(token: string) {
   }
 }
 
+function isExpired(payload: CognitoJwtPayload | null) {
+  if (!payload?.exp) return false
+  return payload.exp * 1000 <= Date.now()
+}
+
+function clearCognitoCookies() {
+  clearCookie("moodot_cognito_access_token")
+  clearCookie("moodot_cognito_id_token")
+  clearCookie("moodot_cognito_refresh_token")
+}
+
 function getCognitoUser(): AppUser | null {
   const token = getCookie("moodot_cognito_id_token")
   if (!token) return null
 
   const payload = decodeJwtPayload(token)
-  if (!payload?.sub) return null
+  if (!payload?.sub || isExpired(payload)) {
+    clearCognitoCookies()
+    return null
+  }
 
   return {
     id: payload.sub,
@@ -84,7 +99,15 @@ function getCognitoUser(): AppUser | null {
 
 export async function getAccessToken() {
   if (isCognitoAuth()) {
-    return getCookie("moodot_cognito_access_token")
+    const token = getCookie("moodot_cognito_access_token")
+    if (!token) return null
+
+    if (isExpired(decodeJwtPayload(token))) {
+      clearCognitoCookies()
+      return null
+    }
+
+    return token
   }
 
   const supabase = getSupabaseBrowserClient()
@@ -164,9 +187,7 @@ export async function signOut() {
   if (isCognitoAuth()) {
     const domain = getCognitoDomain()
     const clientId = getCognitoClientId()
-    clearCookie("moodot_cognito_access_token")
-    clearCookie("moodot_cognito_id_token")
-    clearCookie("moodot_cognito_refresh_token")
+    clearCognitoCookies()
 
     if (domain && clientId) {
       const params = new URLSearchParams({
