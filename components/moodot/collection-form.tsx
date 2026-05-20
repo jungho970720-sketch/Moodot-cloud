@@ -28,6 +28,21 @@ type Props = {
   onDelete?: () => Promise<void>
 }
 
+export function getMemoryLocalDateKey(value: string | null): string | null {
+  if (!value) return null
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    const dateOnly = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0]
+    return dateOnly ?? null
+  }
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 export function CollectionForm({
   collectionId,
   initialValues,
@@ -56,7 +71,8 @@ export function CollectionForm({
   const filteredMemories = availableMemories.filter((m) => {
     if (!startDate && !endDate) return true
     if (!m.memory_at) return true
-    const memDate = m.memory_at.slice(0, 10)
+    const memDate = getMemoryLocalDateKey(m.memory_at)
+    if (!memDate) return true
     if (startDate && memDate < startDate) return false
     if (endDate && memDate > endDate) return false
     return true
@@ -68,7 +84,8 @@ export function CollectionForm({
       const newIds = selectedIds.filter((id) => {
         const m = availableMemories.find((am) => am.id === id)
         if (!m?.memory_at) return true
-        return m.memory_at.slice(0, 10) >= val
+        const memDate = getMemoryLocalDateKey(m.memory_at)
+        return !memDate || memDate >= val
       })
       if (newIds.length !== selectedIds.length) handleSelectedChange(newIds)
     }
@@ -80,7 +97,8 @@ export function CollectionForm({
       const newIds = selectedIds.filter((id) => {
         const m = availableMemories.find((am) => am.id === id)
         if (!m?.memory_at) return true
-        return m.memory_at.slice(0, 10) <= val
+        const memDate = getMemoryLocalDateKey(m.memory_at)
+        return !memDate || memDate <= val
       })
       if (newIds.length !== selectedIds.length) handleSelectedChange(newIds)
     }
@@ -264,9 +282,23 @@ export function CollectionForm({
           {showMemoryPicker && (
             <div className="mt-2 rounded-xl bg-mb-unselected/30 p-3">
               {(startDate || endDate) && filteredMemories.length === 0 ? (
-                <p className="py-4 text-center font-body text-sm text-mb-muted">
-                  해당 기간에 해당하는 기록이 없습니다.
-                </p>
+                <div className="py-4 text-center">
+                  <p className="font-body text-sm text-mb-muted">
+                    해당 기간에 해당하는 기록이 없습니다.
+                  </p>
+                  {availableMemories.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStartDate("")
+                        setEndDate("")
+                      }}
+                      className="mt-3 rounded-full bg-mb-card px-4 py-2 font-body text-xs font-semibold text-mb-dark/70 transition-colors hover:bg-mb-unselected"
+                    >
+                      기간 초기화
+                    </button>
+                  )}
+                </div>
               ) : (
                 <MemoryPicker
                   memories={filteredMemories}
