@@ -22,7 +22,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 MEMORY_TEXT_ENCRYPTION_KEY=
 FRONTEND_ORIGIN=http://localhost:3000
 PORT=4000
+S3_BUCKET=
+S3_REGION=ap-northeast-2
 ```
+
+`S3_BUCKET`과 `S3_REGION`이 있으면 새 이미지 업로드는 S3를 사용하고, DB의
+`image_url`에는 `s3/{userId}/{fileName}` 형태의 경로를 저장합니다. 기존 Supabase
+Storage 경로는 그대로 Supabase에서 signed URL을 발급받습니다.
 
 프론트엔드에서 이 서버를 사용하려면 루트 `.env.local`에 아래 값을 추가합니다.
 
