@@ -113,7 +113,7 @@ export async function signInWithGoogle() {
     scope: "openid email profile",
     redirect_uri: redirectUri,
     identity_provider: "Google",
-    prompt: "select_account",
+    prompt: "login",
   })
 
   window.location.assign(`${domain}/oauth2/authorize?${params.toString()}`)
