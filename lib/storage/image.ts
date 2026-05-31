@@ -1,4 +1,4 @@
-import { getAccessToken, getCurrentUser, signInAnonymously } from "@/lib/supabase/auth"
+import { getAccessToken } from "@/lib/supabase/auth"
 
 const BUCKET = "memory-images"
 const TTL_SECONDS = 3600
@@ -14,13 +14,7 @@ function getApiUrl(path: string) {
 }
 
 async function ensureAccessToken() {
-  let token = await getAccessToken()
-
-  if (!token) {
-    await signInAnonymously()
-    const user = await getCurrentUser()
-    token = user ? await getAccessToken() : null
-  }
+  const token = await getAccessToken()
 
   if (!token) {
     throw new Error("인증에 실패했습니다.")

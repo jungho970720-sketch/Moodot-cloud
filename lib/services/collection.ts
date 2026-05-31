@@ -1,4 +1,4 @@
-import { getAccessToken, getCurrentUser, signInAnonymously } from "@/lib/supabase/auth"
+import { getAccessToken } from "@/lib/supabase/auth"
 import type { MemoryRow } from "./memory"
 
 export type CoverMemory = { image_url: string | null } | null
@@ -117,16 +117,6 @@ export async function getAvailableMemories(currentCollectionId?: string): Promis
 }
 
 export async function createCollection(input: CollectionFormInput): Promise<string> {
-  let user = await getCurrentUser()
-
-  if (!user) {
-    await signInAnonymously()
-    user = await getCurrentUser()
-    if (!user) {
-      throw new Error("인증에 실패했습니다.")
-    }
-  }
-
   const data = await requestJson<{ id: string }>("/api/collections", {
     method: "POST",
     body: JSON.stringify(input),

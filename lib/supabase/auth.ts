@@ -1,5 +1,3 @@
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-import type { User as SupabaseUser } from "@supabase/supabase-js"
 import logger from "@/lib/logger"
 
 export type AppUser = {
@@ -18,15 +16,6 @@ type CognitoJwtPayload = {
   name?: string
   picture?: string
   exp?: number
-}
-
-function getApiUrl(path: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "")
-  return baseUrl ? `${baseUrl}${path}` : path
-}
-
-function isCognitoAuth() {
-  return process.env.NEXT_PUBLIC_AUTH_PROVIDER === "cognito"
 }
 
 function getCognitoDomain() {
@@ -97,192 +86,62 @@ function getCognitoUser(): AppUser | null {
   }
 }
 
-export async function getAccessToken() {
-  if (isCognitoAuth()) {
-    const token = getCookie("moodot_cognito_access_token")
-    if (!token) return null
+export async function getAccessToken(): Promise<string | null> {
+  const token = getCookie("moodot_cognito_access_token")
+  if (!token) return null
 
-    if (isExpired(decodeJwtPayload(token))) {
-      clearCognitoCookies()
-      return null
-    }
-
-    return token
+  if (isExpired(decodeJwtPayload(token))) {
+    clearCognitoCookies()
+    return null
   }
 
-  const supabase = getSupabaseBrowserClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  return session?.access_token ?? null
-}
-
-export async function signInAnonymously() {
-  if (isCognitoAuth()) {
-    return
-  }
-
-  const supabase = getSupabaseBrowserClient()
-  const { error } = await supabase.auth.signInAnonymously()
-  if (error) logger.error("[auth] signInAnonymously error:", error)
+  return token
 }
 
 export async function signInWithGoogle() {
-  if (isCognitoAuth()) {
-    const domain = getCognitoDomain()
-    const clientId = getCognitoClientId()
+  const domain = getCognitoDomain()
+  const clientId = getCognitoClientId()
 
-    if (!domain || !clientId) {
-      throw new Error("Cognito 로그인 환경변수가 설정되지 않았습니다.")
-    }
-
-    const redirectUri = `${window.location.origin}/auth/callback`
-    const params = new URLSearchParams({
-      client_id: clientId,
-      response_type: "code",
-      scope: "openid email profile",
-      redirect_uri: redirectUri,
-      identity_provider: "Google",
-    })
-
-    window.location.assign(`${domain}/oauth2/authorize?${params.toString()}`)
-    return
+  if (!domain || !clientId) {
+    throw new Error("Cognito 로그인 환경변수가 설정되지 않았습니다.")
   }
 
-  const supabase = getSupabaseBrowserClient()
-  const redirectTo = `${window.location.origin}/auth/callback`
-
-  const { data: { user } } = await supabase.auth.getUser()
-
-  logger.debug(
-    "[auth] signInWithGoogle | user.id:", user?.id ?? "null",
-    "| is_anonymous:", user?.is_anonymous ?? "-"
-  )
-
-  // 익명 사용자인 경우 uid 저장 → 로그인 후 데이터 병합에 사용
-  if (user?.is_anonymous) {
-    localStorage.setItem("pre_auth_uid", user.id)
-    logger.debug("[auth] pre_auth_uid 저장:", user.id)
-  }
-
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo,
-      queryParams: {
-        prompt: "select_account",
-      },
-    },
+  const redirectUri = `${window.location.origin}/auth/callback`
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: "code",
+    scope: "openid email profile",
+    redirect_uri: redirectUri,
+    identity_provider: "Google",
   })
 
-  if (error) {
-    logger.error("[auth] signInWithGoogle error:", error)
-    localStorage.removeItem("pre_auth_uid")
-    throw error
-  }
+  window.location.assign(`${domain}/oauth2/authorize?${params.toString()}`)
 }
 
 export async function signOut() {
-  if (isCognitoAuth()) {
-    const domain = getCognitoDomain()
-    const clientId = getCognitoClientId()
-    clearCognitoCookies()
+  const domain = getCognitoDomain()
+  const clientId = getCognitoClientId()
+  clearCognitoCookies()
 
-    if (domain && clientId) {
-      const params = new URLSearchParams({
-        client_id: clientId,
-        logout_uri: `${window.location.origin}/login`,
-      })
-      window.location.assign(`${domain}/logout?${params.toString()}`)
-    }
-
-    return
-  }
-
-  const supabase = getSupabaseBrowserClient()
-  const { error } = await supabase.auth.signOut()
-  if (error) {
-    logger.error("[auth] signOut error:", error)
-    throw error
+  if (domain && clientId) {
+    const params = new URLSearchParams({
+      client_id: clientId,
+      logout_uri: `${window.location.origin}/login`,
+    })
+    window.location.assign(`${domain}/logout?${params.toString()}`)
   }
 }
 
-export async function getCurrentUser(): Promise<AppUser | SupabaseUser | null> {
-  if (isCognitoAuth()) {
-    return getCognitoUser()
-  }
-
-  try {
-    const supabase = getSupabaseBrowserClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    return user ?? null
-  } catch {
-    return null
-  }
+export async function getCurrentUser(): Promise<AppUser | null> {
+  return getCognitoUser()
 }
 
-export async function mergeAnonymousToCurrent(anonUserId: string) {
-  if (isCognitoAuth()) {
-    return
-  }
-
-  const accessToken = await getAccessToken()
-
-  if (!accessToken) {
-    throw new Error("인증이 필요합니다.")
-  }
-
-  const response = await fetch(getApiUrl("/api/auth/merge-anonymous"), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({ anonUserId }),
-  })
-
-  if (response.ok) {
-    return
-  }
-
-  try {
-    const data = (await response.json()) as { error?: string }
-    if (typeof data.error === "string" && data.error.trim() !== "") {
-      throw new Error(data.error)
-    }
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error
-    }
-  }
-
-  throw new Error(`요청이 실패했습니다. (${response.status})`)
-}
-
-/**
- * 컴포넌트에서 auth 상태를 실시간으로 구독합니다.
- * onAuthStateChange는 구독 즉시 현재 세션을 캐시에서 읽어 callback을 실행하므로
- * getUser()의 네트워크 요청 대기 없이 빠르게 초기 상태를 설정할 수 있습니다.
- *
- * @returns 구독 해제 함수 (useEffect cleanup에 사용)
- */
 export function subscribeToAuth(
-  callback: (user: AppUser | SupabaseUser | null) => void,
+  callback: (user: AppUser | null) => void,
 ): () => void {
-  if (isCognitoAuth()) {
-    callback(getCognitoUser())
+  callback(getCognitoUser())
 
-    const onFocus = () => callback(getCognitoUser())
-    window.addEventListener("focus", onFocus)
-    return () => window.removeEventListener("focus", onFocus)
-  }
-
-  const supabase = getSupabaseBrowserClient()
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-    callback(session?.user ?? null)
-  })
-  return () => subscription.unsubscribe()
+  const onFocus = () => callback(getCognitoUser())
+  window.addEventListener("focus", onFocus)
+  return () => window.removeEventListener("focus", onFocus)
 }
