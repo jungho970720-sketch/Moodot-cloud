@@ -6,8 +6,8 @@ import { ArrowLeft, Sparkles } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { subscribeToAuth, signInWithGoogle } from "@/lib/supabase/auth"
-import type { AppUser } from "@/lib/supabase/auth"
+import { subscribeToAuth, signInWithGoogle } from "@/lib/auth"
+import type { AppUser } from "@/lib/auth"
 import logger from "@/lib/logger"
 
 export default function LoginPage() {

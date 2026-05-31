@@ -9,7 +9,7 @@ import {
 } from "../lib/memory-records.js"
 import { encryptMemoryText } from "../lib/memory-text-crypto.js"
 import { getPostgresPool } from "../lib/postgres.js"
-import { getAuthenticatedUser } from "../lib/supabase.js"
+import { getAuthenticatedUser } from "../lib/auth.js"
 
 type CreateMemoryInput = {
   title: string | null

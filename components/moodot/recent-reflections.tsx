@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { getRecentMemories, invalidateRecentMemoriesCache, type MemoryRow } from "@/lib/services/memory"
-import { subscribeToAuth } from "@/lib/supabase/auth"
+import { subscribeToAuth } from "@/lib/auth"
 import logger from "@/lib/logger"
 
 const EMOTION_COLOR_MAP: Record<number, string> = {

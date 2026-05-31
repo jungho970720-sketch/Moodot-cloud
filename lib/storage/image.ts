@@ -1,4 +1,4 @@
-import { getAccessToken } from "@/lib/supabase/auth"
+import { getAccessToken } from "@/lib/auth"
 
 const BUCKET = "memory-images"
 const TTL_SECONDS = 3600

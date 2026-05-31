@@ -5,8 +5,8 @@ import { UserRound } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { subscribeToAuth } from "@/lib/supabase/auth"
-import type { AppUser } from "@/lib/supabase/auth"
+import { subscribeToAuth } from "@/lib/auth"
+import type { AppUser } from "@/lib/auth"
 
 function AuthAvatar() {
   const [user, setUser] = useState<AppUser | null | undefined>(undefined)

@@ -1,4 +1,4 @@
-import { getAccessToken } from "@/lib/supabase/auth"
+import { getAccessToken } from "@/lib/auth"
 
 export type Intervention = {
   id: number

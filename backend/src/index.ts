@@ -5,7 +5,7 @@ import express, { type ErrorRequestHandler } from "express"
 
 import { getAllowedOrigins, getPort } from "./config/env.js"
 import { getPostgresPool } from "./lib/postgres.js"
-import { HttpError } from "./lib/supabase.js"
+import { HttpError } from "./lib/auth.js"
 import { authRouter } from "./routes/auth.js"
 import { collectionsRouter } from "./routes/collections.js"
 import { interventionsRouter } from "./routes/interventions.js"

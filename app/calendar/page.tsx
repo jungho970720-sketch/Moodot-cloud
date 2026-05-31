@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { CalendarView, type CalendarMoodRecord } from "@/components/moodot/calendar-view"
 import { TopAppBar } from "@/components/moodot/top-app-bar"
 import { BottomNavigation } from "@/components/moodot/bottom-navigation"
-import { getCalendarRecords } from "@/lib/supabase/calendar-records"
+import { getCalendarRecords } from "@/lib/calendar-records"
 
 export default function CalendarPage() {
   const [records, setRecords] = useState<CalendarMoodRecord[]>([])

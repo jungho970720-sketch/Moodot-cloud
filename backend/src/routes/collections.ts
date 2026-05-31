@@ -5,7 +5,7 @@ import {
   type MemoryTextDbRow,
 } from "../lib/memory-records.js"
 import { getPostgresPool } from "../lib/postgres.js"
-import { getAuthenticatedUser, HttpError } from "../lib/supabase.js"
+import { getAuthenticatedUser, HttpError } from "../lib/auth.js"
 
 type CoverMemory = { image_url: string | null } | null
 

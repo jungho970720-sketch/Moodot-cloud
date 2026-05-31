@@ -1,7 +1,7 @@
 import { Router } from "express"
 
 import { getPostgresPool } from "../lib/postgres.js"
-import { getAuthenticatedUser, HttpError } from "../lib/supabase.js"
+import { getAuthenticatedUser, HttpError } from "../lib/auth.js"
 
 type Intervention = {
   id: number

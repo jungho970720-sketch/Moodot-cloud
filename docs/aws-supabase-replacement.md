@@ -78,10 +78,10 @@ S3_REGION=ap-northeast-2
 
 ## 다음 단계
 
-1. `interventions`, `intervention_feedback` 백엔드 API의 RDS SQL 경로를 EC2에 배포하고 검증한다.
-2. AI Worker가 읽고 쓰는 `memories`, `interventions`, `intervention_feedback`, `emotion_categories` 접근을 RDS로 옮긴다.
-3. AI Worker의 Supabase Realtime 의존성을 SQS/EventBridge 기반으로 바꾼다.
-4. Supabase fallback 코드 제거 범위를 정리한다.
+1. ~~`interventions`, `intervention_feedback` 백엔드 API의 RDS SQL 경로를 EC2에 배포하고 검증한다.~~ ✅ 완료
+2. ~~AI Worker가 읽고 쓰는 `memories`, `interventions`, `intervention_feedback`, `emotion_categories` 접근을 RDS로 옮긴다.~~ ✅ 완료
+3. AI Worker의 Supabase Realtime 의존성을 SQS/EventBridge 기반으로 바꾼다. (현재 RDS polling으로 대체 중)
+4. ~~Supabase fallback 코드 제거 범위를 정리한다.~~ ✅ 완료 — Supabase 코드/패키지 전부 제거됨
 
 ## RDS 전환을 위한 DB 사용 지도
 

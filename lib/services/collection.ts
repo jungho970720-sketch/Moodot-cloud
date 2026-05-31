@@ -1,4 +1,4 @@
-import { getAccessToken } from "@/lib/supabase/auth"
+import { getAccessToken } from "@/lib/auth"
 import type { MemoryRow } from "./memory"
 
 export type CoverMemory = { image_url: string | null } | null

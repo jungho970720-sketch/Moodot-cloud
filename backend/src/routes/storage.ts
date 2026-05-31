@@ -7,7 +7,7 @@ import {
   createS3SignedUrl,
   uploadObjectToS3,
 } from "../lib/s3-storage.js"
-import { HttpError, getAuthenticatedUser } from "../lib/supabase.js"
+import { HttpError, getAuthenticatedUser } from "../lib/auth.js"
 
 const S3_PATH_PREFIX = "s3/"
 const S3_PATH_FALLBACK_PREFIX = "s3/"

@@ -12,8 +12,8 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { subscribeToAuth, signOut } from "@/lib/supabase/auth"
-import type { AppUser } from "@/lib/supabase/auth"
+import { subscribeToAuth, signOut } from "@/lib/auth"
+import type { AppUser } from "@/lib/auth"
 import logger from "@/lib/logger"
 
 export default function ProfilePage() {

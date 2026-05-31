@@ -1,4 +1,4 @@
-import { getAccessToken } from "@/lib/supabase/auth"
+import { getAccessToken } from "@/lib/auth"
 import logger from "@/lib/logger"
 import type { MemoryMutationInput } from "@/lib/memory-validation"
 

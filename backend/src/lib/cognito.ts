@@ -1,7 +1,7 @@
 import { createPublicKey, createVerify } from "node:crypto"
 import type { JsonWebKey as NodeJsonWebKey } from "node:crypto"
 
-import { HttpError } from "./supabase.js"
+import { HttpError } from "./auth.js"
 
 type CognitoJwtPayload = {
   sub?: string
