@@ -1,6 +1,7 @@
 import { Router } from "express"
 
-import { getSupabaseUserClient } from "../lib/supabase.js"
+import { getPostgresPool, hasPostgresConfig } from "../lib/postgres.js"
+import { getAuthenticatedUser, getSupabaseUserClient, HttpError } from "../lib/supabase.js"
 
 type Intervention = {
   id: number
@@ -19,6 +20,52 @@ export const interventionsRouter = Router()
 
 interventionsRouter.get("/insight-state", async (request, response, next) => {
   try {
+    if (hasPostgresConfig()) {
+      const user = await getAuthenticatedUser(request)
+      const pool = getPostgresPool()
+      const [interventionsResult, latestByCreatedResult, latestByMemoryAtResult] =
+        await Promise.all([
+          pool.query<Intervention>(
+            `
+              select id, reason, message, status, message_type, created_at
+              from public.interventions
+              where status = 'pending'
+                and user_id = $1
+              order by created_at desc
+              limit 1
+            `,
+            [user.id],
+          ),
+          pool.query<{ processed: boolean | null }>(
+            `
+              select processed
+              from public.memories
+              where user_id = $1
+              order by created_at desc
+              limit 1
+            `,
+            [user.id],
+          ),
+          pool.query<{ emotion_id: number | null }>(
+            `
+              select emotion_id
+              from public.memories
+              where user_id = $1
+              order by memory_at desc nulls last, id desc
+              limit 1
+            `,
+            [user.id],
+          ),
+        ])
+
+      response.json({
+        intervention: interventionsResult.rows[0] ?? null,
+        hasUnprocessedLatestMemory: latestByCreatedResult.rows[0]?.processed === false,
+        latestEmotionId: latestByMemoryAtResult.rows[0]?.emotion_id ?? null,
+      })
+      return
+    }
+
     const { supabase, user } = await getSupabaseUserClient(request)
 
     const [{ data: interventions, error: interventionsError }, { data: latestByCreated, error: latestByCreatedError }, { data: latestByMemoryAt, error: latestByMemoryAtError }] =
@@ -76,6 +123,24 @@ interventionsRouter.get("/insight-state", async (request, response, next) => {
 
 interventionsRouter.get("/pending/latest", async (request, response, next) => {
   try {
+    if (hasPostgresConfig()) {
+      const user = await getAuthenticatedUser(request)
+      const { rows } = await getPostgresPool().query<Intervention>(
+        `
+          select id, reason, message, status, message_type, created_at
+          from public.interventions
+          where status = 'pending'
+            and user_id = $1
+          order by created_at desc
+          limit 1
+        `,
+        [user.id],
+      )
+
+      response.json(rows[0] ?? null)
+      return
+    }
+
     const { supabase, user } = await getSupabaseUserClient(request)
 
     const { data, error } = await supabase
@@ -114,6 +179,26 @@ interventionsRouter.patch("/:id/status", async (request, response, next) => {
       return
     }
 
+    if (hasPostgresConfig()) {
+      const user = await getAuthenticatedUser(request)
+      const { rowCount } = await getPostgresPool().query(
+        `
+          update public.interventions
+          set status = $1
+          where id = $2
+            and user_id = $3
+        `,
+        [status, interventionId, user.id],
+      )
+
+      if (rowCount === 0) {
+        throw new HttpError("대상 intervention을 찾을 수 없습니다.", 404)
+      }
+
+      response.status(204).send()
+      return
+    }
+
     const { supabase, user } = await getSupabaseUserClient(request)
     const { error } = await supabase
       .from("interventions")
@@ -141,6 +226,31 @@ interventionsRouter.post("/:id/feedback", async (request, response, next) => {
 
     if (explicitScore !== 2 && explicitScore !== -2) {
       response.status(400).json({ error: "잘못된 explicitScore 입니다." })
+      return
+    }
+
+    if (hasPostgresConfig()) {
+      const user = await getAuthenticatedUser(request)
+      const { rowCount } = await getPostgresPool().query(
+        `
+          insert into public.intervention_feedback (
+            intervention_id,
+            user_id,
+            explicit_score
+          )
+          select id, $2, $3
+          from public.interventions
+          where id = $1
+            and user_id = $2
+        `,
+        [interventionId, user.id, explicitScore],
+      )
+
+      if (rowCount === 0) {
+        throw new HttpError("대상 intervention을 찾을 수 없습니다.", 404)
+      }
+
+      response.status(204).send()
       return
     }
 

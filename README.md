@@ -65,9 +65,6 @@ Local ports:
 Core variables used by the current split runtime:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
 MEMORY_TEXT_ENCRYPTION_KEY=
 NEXT_PUBLIC_API_BASE_URL=
 FRONTEND_ORIGIN=
@@ -79,6 +76,19 @@ COGNITO_DOMAIN=
 COGNITO_CLIENT_ID=
 COGNITO_REGION=
 COGNITO_USER_POOL_ID=
+DB_HOST=
+DB_PORT=
+DB_NAME=
+DB_USER=
+DB_PASSWORD=
+DATABASE_SSL=
+S3_BUCKET=
+S3_REGION=
+
+# Still required for Supabase fallback / remaining AI intervention paths.
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 See [docs/architecture.md](/Users/jungho/Moodot-cloud/docs/architecture.md) for
@@ -90,11 +100,13 @@ more detail on how these are used.
 - Frontend process name: `moodot-fe`
 - Backend process name: `moodot-be`
 - PM2 process list should be saved with `pm2 save` after restart changes.
+- PM2 must be registered with systemd as `pm2-ubuntu` so FE/BE processes are resurrected after EC2 reboot.
 - Elastic IP is used to keep the public address stable across restarts.
 
 Typical EC2 deployment check:
 
 ```bash
+# EC2 terminal
 cd ~/Moodot-cloud
 npm run build
 pm2 restart moodot-fe --update-env
@@ -103,6 +115,8 @@ cd ~/Moodot-cloud/backend
 npm run build
 pm2 restart moodot-be --update-env
 
+pm2 list
+systemctl status pm2-ubuntu --no-pager
 curl -I https://mood-ot.com
 curl https://mood-ot.com/health
 pm2 save

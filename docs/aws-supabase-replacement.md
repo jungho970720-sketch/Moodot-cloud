@@ -9,7 +9,10 @@ Moodot의 Supabase 의존성은 한 번에 제거하지 않고 단계적으로 �
 - Cognito App Client는 secret 없는 SPA 클라이언트를 사용한다.
 - EC2에서는 PM2로 `moodot-fe`, `moodot-be`를 실행한다.
 - `memories` 저장/조회는 RDS PostgreSQL의 `public.memories` 테이블까지 검증했다.
-- RDS 저장 확인은 EC2에서 SQL 조회로 확인한다.
+- `collections`, `collection_memories`도 RDS PostgreSQL에서 생성/연결/조회까지 검증했다.
+- 새 이미지 업로드는 S3 버킷 `moodot-memory-images-jungho-2026`에 `.webp` 객체가 생성되는 것까지 검증했다.
+- 사이트의 memory detail 페이지에서 S3 이미지 signed URL 조회도 확인했다.
+- RDS 저장 확인은 EC2 터미널에서 SQL 조회로 확인한다.
 
 ```sql
 select id, user_id, title, created_at
@@ -25,7 +28,7 @@ limit 5;
 - `cognito`일 때는 AWS Cognito Hosted UI로 Google 로그인을 진행하고, `/auth/callback`에서 토큰을 쿠키에 저장한다.
 - 백엔드는 Cognito JWT를 검증한 뒤, PostgreSQL 환경변수가 있으면 RDS를 사용한다.
 
-즉, 이 단계는 “로그인 입구를 AWS Cognito로 바꾸고, 핵심 기록 저장을 RDS로 옮기는 작업”이다. Storage와 AI Worker 쪽 의존성은 아직 별도 전환 대상이다.
+즉, 이 단계는 “로그인 입구를 AWS Cognito로 바꾸고, 핵심 기록/컬렉션 저장을 RDS로 옮기고, 신규 이미지 저장을 S3로 옮기는 작업”이다. AI Worker와 intervention 관련 일부 API 의존성은 아직 별도 전환 대상이다.
 
 ## AWS 콘솔에서 필요한 Cognito 설정
 
@@ -66,16 +69,19 @@ DB_USER=postgres
 DB_PASSWORD=your-rds-password
 DATABASE_SSL=true
 FRONTEND_ORIGIN=https://mood-ot.com,http://localhost:3000
+
+S3_BUCKET=moodot-memory-images-jungho-2026
+S3_REGION=ap-northeast-2
 ```
 
 배포 환경에서는 `NEXT_PUBLIC_API_BASE_URL=https://mood-ot.com`으로 두고, Nginx가 `/api/` 요청을 백엔드 `127.0.0.1:4000`으로 프록시한다.
 
 ## 다음 단계
 
-1. RDS PostgreSQL을 만들고 Supabase 테이블 구조를 옮긴다.
-2. 백엔드의 Supabase query builder 코드를 SQL/ORM 기반 코드로 교체한다.
-3. Supabase Storage를 S3로 옮긴다.
-4. AI Worker의 Supabase Realtime 의존성을 SQS/EventBridge 기반으로 바꾼다.
+1. `interventions`, `intervention_feedback` 백엔드 API의 RDS SQL 경로를 EC2에 배포하고 검증한다.
+2. AI Worker가 읽고 쓰는 `memories`, `interventions`, `intervention_feedback`, `emotion_categories` 접근을 RDS로 옮긴다.
+3. AI Worker의 Supabase Realtime 의존성을 SQS/EventBridge 기반으로 바꾼다.
+4. Supabase fallback 코드 제거 범위를 정리한다.
 
 ## RDS 전환을 위한 DB 사용 지도
 
@@ -90,7 +96,7 @@ FRONTEND_ORIGIN=https://mood-ot.com,http://localhost:3000
 | `intervention_feedback` | `backend/src/routes/interventions.ts`, `service/main.py`, `service/scoring/feedback_scorer.py` | 사용자의 개입 피드백 |
 | `emotion_categories` | `service/agents/pipeline.py`, `service/tools/emotion_tools.py` | 감정 ID와 감정 카테고리 매핑 |
 
-Supabase Storage는 `memory-images` 버킷을 사용한다. 이 부분은 RDS가 아니라 S3 전환 대상이다.
+기존 Supabase Storage는 `memory-images` 버킷을 사용했다. 현재 신규 업로드는 S3로 저장하며, 기존 Supabase Storage 경로는 호환을 위해 signed URL fallback으로 남겨 둔다.
 
 ## RDS 이전 우선순위
 
@@ -108,20 +114,33 @@ Supabase Storage는 `memory-images` 버킷을 사용한다. 이 부분은 RDS가
    - 기준 데이터 성격이 강하다.
    - RDS 초기 seed 데이터로 관리하는 편이 좋다.
 
-## 다음 실무 작업
+## 완료된 실무 작업
 
-1. Supabase에서 현재 테이블 구조를 확인한다.
-   - Supabase SQL Editor에서 `memories`, `collections`, `collection_memories`, `interventions`, `intervention_feedback`, `emotion_categories`의 컬럼/타입을 확인한다.
-   - RDS 초안은 `docs/rds-schema-draft.sql`에 있다. 실제 Supabase 구조와 비교 후 보정한다.
-2. RDS PostgreSQL을 만든다.
-   - 처음에는 Free tier 또는 가장 작은 인스턴스로 시작한다.
-   - EC2 백엔드에서 접근할 수 있도록 같은 VPC/보안그룹을 맞춘다.
-3. 백엔드에 PostgreSQL 클라이언트를 추가한다.
-   - 후보: `pg` 또는 Prisma.
-   - 현재 코드는 Express API라 `pg`로 시작하는 것이 변경 범위가 작다.
-4. 먼저 `memories` API만 RDS로 바꿔 테스트한다.
+1. RDS PostgreSQL 생성 및 EC2 접근 설정.
+2. 백엔드에 `pg` 기반 PostgreSQL 경로 추가.
+3. `memories` API RDS 전환.
    - `GET /api/memories`
    - `POST /api/memories`
    - `GET /api/memories/:id`
    - `PATCH /api/memories/:id`
    - `DELETE /api/memories/:id`
+4. `collections`, `collection_memories` API RDS 전환.
+5. S3 이미지 업로드 및 signed URL 조회 경로 추가.
+6. `interventions`, `intervention_feedback` 백엔드 API에 RDS SQL 경로 추가.
+
+## 다음 실무 작업
+
+1. EC2 터미널에서 최신 코드를 받은 뒤 백엔드를 빌드/재시작하고 intervention API를 검증한다.
+2. AI Worker의 Supabase 클라이언트 사용 지점을 RDS 또는 이벤트 기반 흐름으로 분리한다.
+3. EC2에서 PM2 중복 프로세스를 확인한 뒤, 변경 배포 시 `pm2 restart ... --update-env`와 `pm2 save`를 수행한다.
+4. EC2 재부팅 후 자동 복구를 위해 `pm2-ubuntu.service`가 enabled/active인지 확인한다.
+
+## 2026-05-31 운영 점검 기록
+
+- `https://mood-ot.com/health`가 502를 반환했다.
+- 원인은 EC2 인스턴스와 Nginx는 살아 있었지만 `moodot-fe`, `moodot-be` PM2 프로세스가 사라진 상태였다.
+- EC2 터미널에서 `pm2 start npm --name moodot-fe -- start`, `pm2 start npm --name moodot-be -- start`, `pm2 save`로 복구했다.
+- `pm2-ubuntu.service`가 없어서 재부팅 자동 복구가 되지 않는 상태였고, `pm2 startup systemd -u ubuntu --hp /home/ubuntu`로 systemd 등록을 완료했다.
+- PM2를 systemd 관리 상태로 전환한 뒤 `pm2-ubuntu.service`는 enabled/active 상태가 됐다.
+- 백엔드 `FRONTEND_ORIGIN`에 `https://www.mood-ot.com`이 빠져 있어 CORS 에러가 있었고, EC2 `backend/.env`를 수정한 뒤 `pm2 restart moodot-be --update-env`로 반영했다.
+- 최종 확인: `/health`는 `{"ok":true}`, `/health/db`는 `{"ok":true,"db":"postgres"}`로 응답했다.
