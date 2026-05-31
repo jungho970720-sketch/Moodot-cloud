@@ -151,6 +151,14 @@ S3_REGION=ap-northeast-2
 - 결과: RDS 연결 성공, `processed=false` memories 조회 성공, `emotion_categories` 조회 성공, 최근 감정 조회 성공.
 - 이 smoke test는 읽기 전용으로 수행했고, `processed` 값이나 `interventions` 데이터는 변경하지 않았다.
 
+## 2026-05-31 AI Worker RDS write smoke test
+
+- EC2 내부에서 테스트용 UUID user와 memory row를 임시 생성했다.
+- `InterventionRepository`가 RDS store를 통해 `public.interventions` row를 생성하는 것을 확인했다.
+- `mark_memory_processed()`가 테스트 memory의 `processed` 값을 `true`로 변경하는 것을 확인했다.
+- `intervention_feedback` 테스트 row를 넣고 `calculate_feedback_score()` / `save_feedback_score()`가 `feedback_score=2`를 저장하는 것을 확인했다.
+- 테스트로 생성한 `intervention_feedback`, `interventions`, `memories` row는 검증 직후 삭제했다.
+
 ## 2026-05-31 운영 점검 기록
 
 - `https://mood-ot.com/health`가 502를 반환했다.
