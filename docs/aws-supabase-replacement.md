@@ -143,6 +143,14 @@ S3_REGION=ap-northeast-2
 - Worker가 직접 사용하는 `memories`, `emotion_categories`, `interventions`, `intervention_feedback` 조회/저장 경로에 RDS store를 추가했다.
 - 이 단계는 SQS/EventBridge 전환 전의 중간 단계다. 실시간성은 약해지지만 Supabase 데이터 의존을 줄이는 안전한 발판이다.
 
+## 2026-05-31 AI Worker RDS smoke test
+
+- 로컬 맥에서 RDS 직접 연결은 timeout이 발생했다. RDS 보안그룹이 EC2 접근 중심으로 잡혀 있기 때문으로 본다.
+- EC2 내부 `/tmp/moodot-service-rds-smoke`에서 Worker RDS store smoke test를 실행했다.
+- EC2에 `python3-pip`를 설치하고, 사용자 영역에 `asyncpg`를 설치했다.
+- 결과: RDS 연결 성공, `processed=false` memories 조회 성공, `emotion_categories` 조회 성공, 최근 감정 조회 성공.
+- 이 smoke test는 읽기 전용으로 수행했고, `processed` 값이나 `interventions` 데이터는 변경하지 않았다.
+
 ## 2026-05-31 운영 점검 기록
 
 - `https://mood-ot.com/health`가 502를 반환했다.

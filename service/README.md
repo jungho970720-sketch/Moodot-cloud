@@ -33,6 +33,7 @@ DB_NAME=postgres
 DB_USER=postgres
 DB_PASSWORD=
 DATABASE_SSL=true
+DB_POOL_MAX_SIZE=2
 ```
 
 `WORKER_DATA_PROVIDER=rds`로 설정하면 Supabase Realtime 구독을 사용하지 않고

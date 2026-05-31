@@ -1,5 +1,6 @@
 import logging
 import os
+import ssl
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -36,10 +37,19 @@ class WorkerPostgresStore:
             or os.getenv("POSTGRES_URL")
         )
         ssl_enabled = os.getenv("DATABASE_SSL", "true").lower() != "false"
-        ssl = True if ssl_enabled else None
+        ssl_context = None
+        if ssl_enabled:
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
 
         if database_url:
-            pool = await asyncpg.create_pool(dsn=database_url, ssl=ssl)
+            pool = await asyncpg.create_pool(
+                dsn=database_url,
+                ssl=ssl_context,
+                min_size=1,
+                max_size=int(os.getenv("DB_POOL_MAX_SIZE", "2")),
+            )
         else:
             pool = await asyncpg.create_pool(
                 host=os.getenv("DB_HOST") or os.getenv("PGHOST"),
@@ -47,7 +57,9 @@ class WorkerPostgresStore:
                 database=os.getenv("DB_NAME") or os.getenv("PGDATABASE") or "postgres",
                 user=os.getenv("DB_USER") or os.getenv("PGUSER") or "postgres",
                 password=os.getenv("DB_PASSWORD") or os.getenv("PGPASSWORD"),
-                ssl=ssl,
+                ssl=ssl_context,
+                min_size=1,
+                max_size=int(os.getenv("DB_POOL_MAX_SIZE", "2")),
             )
 
         return cls(pool)
