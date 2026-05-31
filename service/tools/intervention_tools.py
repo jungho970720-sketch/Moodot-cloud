@@ -45,6 +45,26 @@ async def check_intervention_history(
         >>> history = check_intervention_history(supabase, "user123", hours=24)
     """
     try:
+        if hasattr(supabase, "get_recent_interventions"):
+            interventions = await supabase.get_recent_interventions(user_id, hours=hours)
+            count = len(interventions)
+            last_intervention = None
+            hours_since_last = None
+
+            if interventions:
+                last_created = interventions[0]['created_at']
+                last_intervention = last_created
+                last_dt = last_created if isinstance(last_created, datetime) else datetime.fromisoformat(str(last_created).replace('Z', '+00:00'))
+                now_dt = datetime.now(last_dt.tzinfo)
+                hours_since_last = (now_dt - last_dt).total_seconds() / 3600
+
+            return {
+                "count": count,
+                "last_intervention": last_intervention.isoformat() if hasattr(last_intervention, "isoformat") else last_intervention,
+                "hours_since_last": round(hours_since_last, 2) if hours_since_last else None,
+                "has_recent_intervention": count > 0
+            }
+
         # N시간 전 시간 계산
         cutoff_time = datetime.now() - timedelta(hours=hours)
         cutoff_str = cutoff_time.isoformat()
@@ -115,6 +135,11 @@ async def count_today_interventions(
         2
     """
     try:
+        if hasattr(supabase, "count_today_interventions"):
+            count = await supabase.count_today_interventions(user_id)
+            logger.info(f"Today's interventions for user {user_id}: {count}")
+            return count
+
         # 오늘 00:00:00
         today_start = datetime.now().replace(
             hour=0, minute=0, second=0, microsecond=0
@@ -156,6 +181,11 @@ async def get_last_intervention_time(
         datetime(2024, 1, 20, 14, 30, 0)
     """
     try:
+        if hasattr(supabase, "get_last_intervention_time"):
+            last_time = await supabase.get_last_intervention_time(user_id)
+            logger.debug(f"Last intervention time for user {user_id}: {last_time}")
+            return last_time
+
         result = await supabase.table('interventions')\
             .select('created_at')\
             .eq('user_id', user_id)\

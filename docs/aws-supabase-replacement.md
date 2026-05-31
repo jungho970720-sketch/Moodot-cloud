@@ -131,9 +131,17 @@ S3_REGION=ap-northeast-2
 ## 다음 실무 작업
 
 1. EC2 터미널에서 최신 코드를 받은 뒤 백엔드를 빌드/재시작하고 intervention API를 검증한다.
-2. AI Worker의 Supabase 클라이언트 사용 지점을 RDS 또는 이벤트 기반 흐름으로 분리한다.
-3. EC2에서 PM2 중복 프로세스를 확인한 뒤, 변경 배포 시 `pm2 restart ... --update-env`와 `pm2 save`를 수행한다.
-4. EC2 재부팅 후 자동 복구를 위해 `pm2-ubuntu.service`가 enabled/active인지 확인한다.
+2. AI Worker의 RDS polling 모드를 실제 RDS 환경변수로 실행 검증한다.
+3. AI Worker의 실시간 이벤트 흐름을 SQS/EventBridge 기반으로 분리한다.
+4. EC2에서 PM2 중복 프로세스를 확인한 뒤, 변경 배포 시 `pm2 restart ... --update-env`와 `pm2 save`를 수행한다.
+5. EC2 재부팅 후 자동 복구를 위해 `pm2-ubuntu.service`가 enabled/active인지 확인한다.
+
+## AI Worker RDS 전환 메모
+
+- `WORKER_DATA_PROVIDER=rds`를 설정하면 AI Worker는 Supabase Realtime 구독 대신 RDS PostgreSQL polling 모드로 동작한다.
+- polling 모드는 `public.memories`의 `processed=false` 기록을 주기적으로 조회하고, 개입 생성 후 `processed=true`로 바꾼다.
+- Worker가 직접 사용하는 `memories`, `emotion_categories`, `interventions`, `intervention_feedback` 조회/저장 경로에 RDS store를 추가했다.
+- 이 단계는 SQS/EventBridge 전환 전의 중간 단계다. 실시간성은 약해지지만 Supabase 데이터 의존을 줄이는 안전한 발판이다.
 
 ## 2026-05-31 운영 점검 기록
 

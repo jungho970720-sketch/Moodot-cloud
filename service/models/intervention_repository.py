@@ -4,7 +4,6 @@ Intervention 데이터 접근 레이어 (최소 버전)
 import logging
 from typing import Optional, List
 from datetime import datetime, timedelta
-from supabase import Client
 
 from .intervention import Intervention, InterventionStatus
 
@@ -15,7 +14,7 @@ class InterventionRepository:
 
 
     """Intervention 데이터베이스 접근"""
-    def __init__(self, supabase: Client):
+    def __init__(self, supabase):
         self.supabase = supabase
         self.table = 'interventions'
     
@@ -34,6 +33,14 @@ class InterventionRepository:
             data = intervention.to_db_dict()
             
             logger.info(f"💾 Intervention 저장: {intervention.reason}")
+
+            if hasattr(self.supabase, "create_intervention"):
+                intervention_id = await self.supabase.create_intervention(data)
+                if intervention_id:
+                    logger.info(f"✅ 저장 완료: {intervention_id}")
+                    return intervention_id
+                logger.error("❌ 저장 실패: 응답 데이터 없음")
+                return None
             
             result = await self.supabase.table(self.table)\
                 .insert(data)\
@@ -65,6 +72,12 @@ class InterventionRepository:
             Intervention 리스트
         """
         try:
+            if hasattr(self.supabase, "get_pending_interventions"):
+                rows = await self.supabase.get_pending_interventions(user_id, limit)
+                interventions = [Intervention.from_db_dict(item) for item in rows]
+                logger.debug(f"Pending 조회: {len(interventions)}개")
+                return interventions
+
             result = await self.supabase.table(self.table)\
                 .select('*')\
                 .eq('user_id', user_id)\
@@ -104,6 +117,17 @@ class InterventionRepository:
             성공 여부
         """
         try:
+            if hasattr(self.supabase, "update_intervention_status"):
+                success = await self.supabase.update_intervention_status(
+                    intervention_id,
+                    status.value,
+                )
+                if success:
+                    logger.info(f"✅ 상태 업데이트: {intervention_id} → {status.value}")
+                else:
+                    logger.warning(f"⚠️ 상태 업데이트 실패: {intervention_id}")
+                return success
+
             result = await self.supabase.table(self.table)\
                 .update({'status': status.value})\
                 .eq('id', intervention_id)\
@@ -132,6 +156,11 @@ class InterventionRepository:
             개입 횟수
         """
         try:
+            if hasattr(self.supabase, "count_today_interventions"):
+                count = await self.supabase.count_today_interventions(user_id)
+                logger.debug(f"오늘 개입: {count}회")
+                return count
+
             today_start = datetime.now().replace(
                 hour=0, minute=0, second=0, microsecond=0
             ).isoformat()
@@ -169,6 +198,10 @@ class InterventionRepository:
             Intervention 리스트
         """
         try:
+            if hasattr(self.supabase, "get_recent_interventions"):
+                rows = await self.supabase.get_recent_interventions(user_id, hours, limit)
+                return [Intervention.from_db_dict(item) for item in rows]
+
             cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
             
             result = await self.supabase.table(self.table)\
@@ -190,4 +223,3 @@ class InterventionRepository:
         except Exception as e:
             logger.error(f"❌ 최근 개입 조회 실패: {e}")
             return []
-

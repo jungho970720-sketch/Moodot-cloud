@@ -3,7 +3,6 @@
 """
 import logging
 from typing import Optional
-from supabase import Client
 
 REASON_TO_DEFAULT_ACTION = {
     "negative_pattern":      "empathy",
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 async def get_feedback_trend(
-    supabase: Client,
+    supabase,
     user_id: str,
     limit: int = 5
 ) -> Optional[float]:
@@ -32,6 +31,9 @@ async def get_feedback_trend(
     shown 기록이 없으면 None.
     """
     try:
+        if hasattr(supabase, "get_feedback_trend"):
+            return await supabase.get_feedback_trend(user_id, limit)
+
         result = await supabase.table("interventions") \
             .select("feedback_score") \
             .eq("user_id", user_id) \

@@ -40,6 +40,9 @@ async def get_recent_emotions(
         감정 기록 리스트
     """
     try:
+        if hasattr(supabase, "get_recent_emotions"):
+            return await supabase.get_recent_emotions(user_id, days=days, limit=limit)
+
         start_date = datetime.now() - timedelta(days=days)
         start_date_str = start_date.isoformat()
         
@@ -111,6 +114,9 @@ async def get_days_since_last_record(
         경과 일수 (기록 없으면 None)
     """
     try:
+        if hasattr(supabase, "get_days_since_last_record"):
+            return await supabase.get_days_since_last_record(user_id)
+
         result = await supabase.table('memories')\
             .select('created_at')\
             .eq('user_id', user_id)\
@@ -159,6 +165,9 @@ async def get_consecutive_emotions(
         연속된 감정 개수
     """
     try:
+        if hasattr(supabase, "get_consecutive_emotions"):
+            return await supabase.get_consecutive_emotions(user_id, emotion_type, limit)
+
         result = await supabase.table('memories')\
             .select('''
                 id,
@@ -286,6 +295,9 @@ async def get_emotion_by_id(
         감정 정보 딕셔너리
     """
     try:
+        if hasattr(supabase, "get_emotion_by_id"):
+            return await supabase.get_emotion_by_id(emotion_id)
+
         result = await supabase.table('emotion_categories')\
             .select('*')\
             .eq('emotion_id', emotion_id)\

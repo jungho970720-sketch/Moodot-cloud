@@ -5,7 +5,7 @@ import logging
 from dotenv import load_dotenv
 from supabase import acreate_client
 from typing import Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 load_dotenv('.env.local')
 
@@ -20,6 +20,7 @@ from rules import RuleEngine
 from config import LLMFactory
 from generators import MessageGenerator
 from agents import Pipeline
+from db import WorkerPostgresStore
 
 
 async def create_supabase_client():
@@ -31,20 +32,37 @@ async def create_supabase_client():
     return client
 
 
+async def create_data_store():
+    provider = os.getenv("WORKER_DATA_PROVIDER", "supabase").lower()
+
+    if provider in ("rds", "postgres", "postgresql"):
+        logger.info("📡 Worker data provider: RDS PostgreSQL")
+        return await WorkerPostgresStore.create()
+
+    logger.info(f"📡 Supabase URL: {os.getenv('SUPABASE_URL')}")
+    return await create_supabase_client()
+
+
 async def process_missed_emotions(supabase, pipeline: Pipeline) -> None:
     """워커가 다운되었을 때 놓친 감정 처리 (안전장치)"""
     logger.info("🔍 놓친 감정 확인 중...")
     try:
-        one_minute_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
-        result = await supabase.table('memories') \
-            .select('*') \
-            .eq('processed', False) \
-            .lt('created_at', one_minute_ago) \
-            .order('created_at') \
-            .limit(10) \
-            .execute()
+        if hasattr(supabase, "fetch_unprocessed_memories"):
+            missed = await supabase.fetch_unprocessed_memories(
+                datetime.now(timezone.utc) - timedelta(minutes=1),
+                limit=10,
+            )
+        else:
+            one_minute_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
+            result = await supabase.table('memories') \
+                .select('*') \
+                .eq('processed', False) \
+                .lt('created_at', one_minute_ago) \
+                .order('created_at') \
+                .limit(10) \
+                .execute()
 
-        missed = result.data if hasattr(result, 'data') else []
+            missed = result.data if hasattr(result, 'data') else []
         if not missed:
             logger.info("✅ 놓친 감정 없음")
             return
@@ -145,11 +163,10 @@ async def realtime_watchdog(supabase, pipeline: Pipeline) -> None:
 
 async def main() -> None:
     logger.info("🚀 AI 에이전트 워커 시작...")
-    logger.info(f"📡 Supabase URL: {os.getenv('SUPABASE_URL')}")
 
-    supabase = await create_supabase_client()
-    intervention_repo = InterventionRepository(supabase)
-    rule_engine = RuleEngine(supabase)
+    data_store = await create_data_store()
+    intervention_repo = InterventionRepository(data_store)
+    rule_engine = RuleEngine(data_store)
 
     try:
         llm = LLMFactory.create()
@@ -159,25 +176,30 @@ async def main() -> None:
         message_generator = None
         logger.warning(f"⚠️ LLM 연결 실패 — 템플릿 메시지로 동작합니다: {e}")
 
-    pipeline = Pipeline(supabase, intervention_repo, rule_engine, message_generator)
+    pipeline = Pipeline(data_store, intervention_repo, rule_engine, message_generator)
 
-    for attempt in range(3):
-        try:
-            await subscribe_channels(supabase, pipeline)
-            logger.info("👂 이벤트 대기 중... (Ctrl+C로 종료)")
-            break
-        except Exception as e:
-            logger.error(f"구독 실패 (시도 {attempt + 1}/3): {e}")
-            if attempt == 2:
-                raise
-            await asyncio.sleep(5)
-
-    await asyncio.gather(
+    tasks = [
         health_server(),
-        initial_check(supabase, pipeline),
-        periodic_check(supabase, pipeline),
-        realtime_watchdog(supabase, pipeline),
-    )
+        initial_check(data_store, pipeline),
+        periodic_check(data_store, pipeline),
+    ]
+
+    if hasattr(data_store, "channel"):
+        for attempt in range(3):
+            try:
+                await subscribe_channels(data_store, pipeline)
+                logger.info("👂 이벤트 대기 중... (Ctrl+C로 종료)")
+                break
+            except Exception as e:
+                logger.error(f"구독 실패 (시도 {attempt + 1}/3): {e}")
+                if attempt == 2:
+                    raise
+                await asyncio.sleep(5)
+        tasks.append(realtime_watchdog(data_store, pipeline))
+    else:
+        logger.info("👂 RDS polling 모드로 동작합니다. Realtime 구독은 사용하지 않습니다.")
+
+    await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":

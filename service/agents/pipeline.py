@@ -38,12 +38,15 @@ class Pipeline:
 
             emotion_id = emotion.get("emotion_id")
             try:
-                result = await self.supabase.table("emotion_categories") \
-                    .select("emotion") \
-                    .eq("emotion_id", emotion_id) \
-                    .single() \
-                    .execute()
-                emotion_name = result.data["emotion"] if result.data else "Unknown"
+                if hasattr(self.supabase, "get_emotion_name"):
+                    emotion_name = await self.supabase.get_emotion_name(emotion_id)
+                else:
+                    result = await self.supabase.table("emotion_categories") \
+                        .select("emotion") \
+                        .eq("emotion_id", emotion_id) \
+                        .single() \
+                        .execute()
+                    emotion_name = result.data["emotion"] if result.data else "Unknown"
             except Exception as e:
                 logger.error(f"감정 카테고리 조회 실패: {e}")
                 emotion_name = "Unknown"
@@ -54,7 +57,7 @@ class Pipeline:
             logger.info(f"   사용자: {user_id}")
             logger.info(f"   감정: {emotion_name}")
             logger.info(f"   내용: {emotion.get('text', 'N/A')}")
-            logger.info(f"   시간: {emotion['created_at']}")
+            logger.info(f"   시간: {emotion.get('created_at')}")
             logger.info("=" * 50)
 
             decision = await self.rule_engine.evaluate(user_id)
@@ -122,6 +125,13 @@ class Pipeline:
     async def _mark_as_processed(self, emotion_id: str) -> None:
         """감정 기록을 처리 완료 상태로 변경"""
         try:
+            if hasattr(self.supabase, "mark_memory_processed"):
+                if await self.supabase.mark_memory_processed(emotion_id):
+                    logger.debug(f"Processed 플래그 업데이트 성공: {emotion_id}")
+                else:
+                    logger.warning(f"Processed 플래그 업데이트 실패: {emotion_id}")
+                return
+
             result = await self.supabase.table("memories") \
                 .update({"processed": True}) \
                 .eq("id", emotion_id) \

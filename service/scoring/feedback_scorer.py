@@ -2,12 +2,11 @@
 피드백 점수 계산
 """
 import logging
-from supabase import Client
 
 logger = logging.getLogger(__name__)
 
 
-async def calculate_score(supabase: Client, intervention_id: str) -> int:
+async def calculate_score(supabase, intervention_id: str) -> int:
     """
     intervention에 달린 모든 피드백 신호를 합산해 총점 반환.
 
@@ -20,6 +19,11 @@ async def calculate_score(supabase: Client, intervention_id: str) -> int:
         0 미만  → 별로
     """
     try:
+        if hasattr(supabase, "calculate_feedback_score"):
+            score = await supabase.calculate_feedback_score(intervention_id)
+            logger.debug(f"점수 계산 완료: intervention={intervention_id}, score={score}")
+            return score
+
         result = await supabase.table("intervention_feedback") \
             .select("explicit_score") \
             .eq("intervention_id", intervention_id) \
@@ -35,9 +39,14 @@ async def calculate_score(supabase: Client, intervention_id: str) -> int:
         return 0
 
 
-async def save_score(supabase: Client, intervention_id: str, score: int) -> None:
+async def save_score(supabase, intervention_id: str, score: int) -> None:
     """총점을 interventions.feedback_score에 저장"""
     try:
+        if hasattr(supabase, "save_feedback_score"):
+            await supabase.save_feedback_score(intervention_id, score)
+            logger.info(f"✅ feedback_score 저장: intervention={intervention_id}, score={score}")
+            return
+
         await supabase.table("interventions") \
             .update({"feedback_score": score}) \
             .eq("id", intervention_id) \

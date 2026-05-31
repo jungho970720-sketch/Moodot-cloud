@@ -123,6 +123,7 @@ Remaining candidates:
 
 - Deploy and verify the RDS SQL path for `interventions` and `intervention_feedback`.
 - Deploy AI worker through ECS or another isolated runtime
+- Verify AI Worker RDS polling mode against the deployed RDS database.
 - Replace AI Worker Supabase Realtime dependency with SQS/EventBridge or another AWS-native event path.
 - Add production deployment steps to the new CI workflows
 
