@@ -136,8 +136,7 @@ export default function ProfilePage() {
                     setSignOutError(false)
                     setIsSigningOut(true)
                     await signOut()
-                    router.push("/login")
-                    router.refresh()
+                    // signOut()이 Cognito /logout으로 리다이렉트하므로 여기서 추가 라우팅 불필요
                   } catch (e) {
                     logger.error("[profile] signOut error:", e)
                     setSignOutError(true)
