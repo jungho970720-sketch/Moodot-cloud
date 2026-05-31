@@ -5,14 +5,12 @@ import { Router } from "express"
 
 import {
   createS3SignedUrl,
-  hasS3StorageConfig,
   uploadObjectToS3,
 } from "../lib/s3-storage.js"
-import { HttpError, getAuthenticatedUser, getSupabaseUserClient } from "../lib/supabase.js"
+import { HttpError, getAuthenticatedUser } from "../lib/supabase.js"
 
-const BUCKET = "memory-images"
 const S3_PATH_PREFIX = "s3/"
-const SIGNED_URL_TTL_SECONDS = 3600
+const S3_PATH_FALLBACK_PREFIX = "s3/"
 
 type UploadImageInput = {
   fileName?: unknown
@@ -45,7 +43,7 @@ function toS3StoragePath(key: string) {
 }
 
 function getS3ObjectKey(path: string) {
-  return path.startsWith(S3_PATH_PREFIX) ? path.slice(S3_PATH_PREFIX.length) : null
+  return path.startsWith(S3_PATH_FALLBACK_PREFIX) ? path.slice(S3_PATH_FALLBACK_PREFIX.length) : null
 }
 
 export const storageRouter = Router()
@@ -63,32 +61,17 @@ storageRouter.post("/images", async (request, response, next) => {
         : null
     const fileBuffer = parseBase64Payload(input.fileData)
 
-    const user = hasS3StorageConfig()
-      ? await getAuthenticatedUser(request)
-      : (await getSupabaseUserClient(request)).user
+    const user = await getAuthenticatedUser(request)
     const ext = getFileExtension(fileName, fileType)
     const path = `${user.id}/${Date.now()}-${randomUUID()}.${ext}`
 
-    if (hasS3StorageConfig()) {
-      await uploadObjectToS3({
-        key: path,
-        body: fileBuffer,
-        contentType: fileType,
-      })
-
-      response.status(201).json({ path: toS3StoragePath(path) })
-      return
-    }
-
-    const { supabase } = await getSupabaseUserClient(request)
-    const { error } = await supabase.storage.from(BUCKET).upload(path, fileBuffer, {
-      contentType: fileType ?? undefined,
-      upsert: false,
+    await uploadObjectToS3({
+      key: path,
+      body: fileBuffer,
+      contentType: fileType,
     })
 
-    if (error) throw error
-
-    response.status(201).json({ path })
+    response.status(201).json({ path: toS3StoragePath(path) })
   } catch (error) {
     next(error)
   }
@@ -107,24 +90,13 @@ storageRouter.get("/images/signed-url", async (request, response, next) => {
     }
 
     const s3Key = getS3ObjectKey(path)
-    if (s3Key && hasS3StorageConfig()) {
-      try {
-        const url = await createS3SignedUrl(s3Key)
-        response.json({ url })
-        return
-      } catch (error) {
-        console.warn("[storage] S3 signed URL failed; falling back to Supabase Storage.", error)
-      }
+    if (!s3Key) {
+      response.status(400).json({ error: "유효하지 않은 이미지 경로입니다." })
+      return
     }
 
-    const { supabase } = await getSupabaseUserClient(request)
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrl(path, SIGNED_URL_TTL_SECONDS)
-
-    if (error) throw error
-
-    response.json({ url: data.signedUrl })
+    const url = await createS3SignedUrl(s3Key)
+    response.json({ url })
   } catch (error) {
     next(error)
   }

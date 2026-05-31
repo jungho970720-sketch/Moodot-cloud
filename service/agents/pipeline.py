@@ -19,12 +19,12 @@ class Pipeline:
 
     def __init__(
         self,
-        supabase,
+        store,
         intervention_repo: InterventionRepository,
         rule_engine: RuleEngine,
         message_generator: Optional[MessageGenerator],
     ):
-        self.supabase = supabase
+        self.store = store
         self.intervention_repo = intervention_repo
         self.rule_engine = rule_engine
         self.message_generator = message_generator
@@ -38,15 +38,7 @@ class Pipeline:
 
             emotion_id = emotion.get("emotion_id")
             try:
-                if hasattr(self.supabase, "get_emotion_name"):
-                    emotion_name = await self.supabase.get_emotion_name(emotion_id)
-                else:
-                    result = await self.supabase.table("emotion_categories") \
-                        .select("emotion") \
-                        .eq("emotion_id", emotion_id) \
-                        .single() \
-                        .execute()
-                    emotion_name = result.data["emotion"] if result.data else "Unknown"
+                emotion_name = await self.store.get_emotion_name(emotion_id)
             except Exception as e:
                 logger.error(f"감정 카테고리 조회 실패: {e}")
                 emotion_name = "Unknown"
@@ -117,27 +109,15 @@ class Pipeline:
             if not intervention_id:
                 return
 
-            score = await calculate_score(self.supabase, intervention_id)
-            await save_score(self.supabase, intervention_id, score)
+            score = await calculate_score(self.store, intervention_id)
+            await save_score(self.store, intervention_id, score)
         except Exception as e:
             logger.error(f"❌ 피드백 처리 실패: {e}", exc_info=True)
 
     async def _mark_as_processed(self, emotion_id: str) -> None:
         """감정 기록을 처리 완료 상태로 변경"""
         try:
-            if hasattr(self.supabase, "mark_memory_processed"):
-                if await self.supabase.mark_memory_processed(emotion_id):
-                    logger.debug(f"Processed 플래그 업데이트 성공: {emotion_id}")
-                else:
-                    logger.warning(f"Processed 플래그 업데이트 실패: {emotion_id}")
-                return
-
-            result = await self.supabase.table("memories") \
-                .update({"processed": True}) \
-                .eq("id", emotion_id) \
-                .execute()
-
-            if hasattr(result, "data") and result.data:
+            if await self.store.mark_memory_processed(emotion_id):
                 logger.debug(f"Processed 플래그 업데이트 성공: {emotion_id}")
             else:
                 logger.warning(f"Processed 플래그 업데이트 실패: {emotion_id}")

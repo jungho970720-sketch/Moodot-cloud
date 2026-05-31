@@ -4,7 +4,7 @@ import cors from "cors"
 import express, { type ErrorRequestHandler } from "express"
 
 import { getAllowedOrigins, getPort } from "./config/env.js"
-import { getPostgresPool, hasPostgresConfig } from "./lib/postgres.js"
+import { getPostgresPool } from "./lib/postgres.js"
 import { HttpError } from "./lib/supabase.js"
 import { authRouter } from "./routes/auth.js"
 import { collectionsRouter } from "./routes/collections.js"
@@ -36,11 +36,6 @@ app.get("/health", (_request, response) => {
 
 app.get("/health/db", async (_request, response, next) => {
   try {
-    if (!hasPostgresConfig()) {
-      response.status(503).json({ ok: false, db: "not_configured" })
-      return
-    }
-
     await getPostgresPool().query("select 1")
     response.json({ ok: true, db: "postgres" })
   } catch (error) {
