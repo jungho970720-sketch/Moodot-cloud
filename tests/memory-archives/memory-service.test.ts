@@ -2,16 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { getMemories, getMemoryById } from "@/lib/services/memory"
 
-const { getSessionMock } = vi.hoisted(() => ({
-  getSessionMock: vi.fn(),
+const { getAccessTokenMock } = vi.hoisted(() => ({
+  getAccessTokenMock: vi.fn(),
 }))
 
-vi.mock("@/lib/supabase/client", () => ({
-  getSupabaseBrowserClient: () => ({
-    auth: {
-      getSession: getSessionMock,
-    },
-  }),
+vi.mock("@/lib/auth", () => ({
+  getAccessToken: getAccessTokenMock,
 }))
 
 describe("memory service", () => {
@@ -19,8 +15,8 @@ describe("memory service", () => {
 
   beforeEach(() => {
     fetchMock.mockReset()
-    getSessionMock.mockReset()
-    getSessionMock.mockResolvedValue({ data: { session: null } })
+    getAccessTokenMock.mockReset()
+    getAccessTokenMock.mockResolvedValue(null)
     vi.stubGlobal("fetch", fetchMock)
   })
 
@@ -70,6 +66,22 @@ describe("memory service", () => {
       "/api/memories/7",
       expect.anything(),
     )
+  })
+
+  it("access token 이 있으면 Authorization 헤더를 포함한다", async () => {
+    getAccessTokenMock.mockResolvedValue("user-a-token")
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    )
+
+    await getMemories()
+
+    const init = fetchMock.mock.calls[0]?.[1]
+    const headers = new Headers(init?.headers)
+    expect(headers.get("Authorization")).toBe("Bearer user-a-token")
   })
 
   it("API 가 에러 응답을 주면 에러 메시지를 그대로 던진다", async () => {
