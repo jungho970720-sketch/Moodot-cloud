@@ -14,9 +14,31 @@ type CognitoJwtPayload = {
   sub?: string
   email?: string
   name?: string
+  given_name?: string
+  family_name?: string
+  nickname?: string
+  preferred_username?: string
   picture?: string
+  "cognito:username"?: string
   exp?: number
 }
+
+type CognitoUserInfo = {
+  sub?: string
+  email?: string
+  name?: string
+  given_name?: string
+  family_name?: string
+  nickname?: string
+  preferred_username?: string
+  picture?: string
+  username?: string
+}
+
+let userInfoCache: {
+  accessToken: string
+  user: AppUser
+} | null = null
 
 function getCognitoDomain() {
   return process.env.NEXT_PUBLIC_COGNITO_DOMAIN?.replace(/\/$/, "")
@@ -63,9 +85,38 @@ function clearCognitoCookies() {
   clearCookie("moodot_cognito_access_token")
   clearCookie("moodot_cognito_id_token")
   clearCookie("moodot_cognito_refresh_token")
+  userInfoCache = null
 }
 
-function getCognitoUser(): AppUser | null {
+function getDisplayName(payload: CognitoJwtPayload | CognitoUserInfo) {
+  const fullName = [payload.given_name, payload.family_name].filter(Boolean).join(" ")
+  return (
+    payload.name ??
+    (fullName || undefined) ??
+    payload.nickname ??
+    payload.preferred_username ??
+    payload.email?.split("@")[0] ??
+    ("cognito:username" in payload ? payload["cognito:username"] : undefined) ??
+    ("username" in payload ? payload.username : undefined)
+  )
+}
+
+function toAppUser(payload: CognitoJwtPayload | CognitoUserInfo): AppUser | null {
+  const id = payload.sub
+  if (!id) return null
+
+  return {
+    id,
+    email: payload.email ?? null,
+    is_anonymous: false,
+    user_metadata: {
+      name: getDisplayName(payload),
+      avatar_url: payload.picture,
+    },
+  }
+}
+
+function getCognitoUserFromToken(): AppUser | null {
   const token = getCookie("moodot_cognito_id_token")
   if (!token) return null
 
@@ -75,14 +126,35 @@ function getCognitoUser(): AppUser | null {
     return null
   }
 
-  return {
-    id: payload.sub,
-    email: payload.email ?? null,
-    is_anonymous: false,
-    user_metadata: {
-      name: payload.name,
-      avatar_url: payload.picture,
-    },
+  return toAppUser(payload)
+}
+
+async function fetchCognitoUserInfo(): Promise<AppUser | null> {
+  const domain = getCognitoDomain()
+  const accessToken = await getAccessToken()
+  if (!domain || !accessToken) return null
+
+  if (userInfoCache?.accessToken === accessToken) {
+    return userInfoCache.user
+  }
+
+  try {
+    const response = await fetch(`${domain}/oauth2/userInfo`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!response.ok) return null
+
+    const user = toAppUser((await response.json()) as CognitoUserInfo)
+    if (user) {
+      userInfoCache = { accessToken, user }
+    }
+    return user
+  } catch (error) {
+    logger.warn("[auth] Cognito userInfo fetch failed:", error)
+    return null
   }
 }
 
@@ -134,15 +206,28 @@ export async function signOut() {
 }
 
 export async function getCurrentUser(): Promise<AppUser | null> {
-  return getCognitoUser()
+  return (await fetchCognitoUserInfo()) ?? getCognitoUserFromToken()
 }
 
 export function subscribeToAuth(
   callback: (user: AppUser | null) => void,
 ): () => void {
-  callback(getCognitoUser())
+  let isSubscribed = true
+  callback(getCognitoUserFromToken())
 
-  const onFocus = () => callback(getCognitoUser())
+  fetchCognitoUserInfo().then((user) => {
+    if (isSubscribed && user) callback(user)
+  })
+
+  const onFocus = () => {
+    callback(getCognitoUserFromToken())
+    fetchCognitoUserInfo().then((user) => {
+      if (isSubscribed && user) callback(user)
+    })
+  }
   window.addEventListener("focus", onFocus)
-  return () => window.removeEventListener("focus", onFocus)
+  return () => {
+    isSubscribed = false
+    window.removeEventListener("focus", onFocus)
+  }
 }
