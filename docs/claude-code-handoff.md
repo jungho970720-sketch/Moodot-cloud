@@ -437,6 +437,24 @@ aws cognito-idp list-users \
 - 커밋:
   - `a743c53 test: cover authenticated archive service requests`
 
+## 2026-06-04 AI Worker SQS/EventBridge 전환 준비
+
+- 목적:
+  - 현재 AI Worker의 RDS polling 구조를 SQS/EventBridge 기반 이벤트 흐름으로 옮기기 위한 사전 정리
+- 문서 추가:
+  - `docs/ai-worker-sqs-eventbridge-plan.md`
+- 정리 내용:
+  - 현재 RDS polling 구조
+  - 목표 SQS long polling 구조
+  - EventBridge는 이벤트 종류가 늘어난 뒤 확장하는 방향
+  - SQS queue/DLQ/IAM 권한 후보
+  - backend memory 생성 후 SQS message 전송 방향
+  - Worker가 `memory_id`로 RDS를 다시 조회해 처리하는 방향
+  - RDS polling fallback 유지 전략
+- 추가 정리:
+  - `service/README.md`에서 Supabase Realtime 관련 오래된 문구 제거
+  - `docs/architecture.md`를 현재 Cognito/RDS/S3/PM2 구조에 맞게 갱신
+
 ## 다음으로 할 일
 
 Supabase 이관은 완료됨. 남은 후보 작업:
@@ -444,7 +462,7 @@ Supabase 이관은 완료됨. 남은 후보 작업:
 1. **비용 절감 운영 유지** — 테스트가 끝나면 EC2/RDS를 중지해서 비용 관리
 2. **신규 사용자 온보딩/프로필 UX 개선** — 이름/이메일/프로필 이미지 표시 범위 확대
 3. **사용자별 기록/컬렉션 통합 테스트 후보** — RDS를 켠 상태에서 실제 DB 격리 테스트 추가 검토
-4. **SQS/EventBridge 전환** — AI Worker 이벤트 흐름 고도화 (현재 RDS polling으로 임시 대체 중)
+4. **SQS/EventBridge 구현** — 계획 문서 기준으로 SQS 리소스 생성, backend enqueue, Worker consume 구현
 5. **OpenAI 크레딧 충전** — AI Worker LLM 메시지 생성 정상 동작 확인
 6. **신규 기능 개발**
 

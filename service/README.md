@@ -4,7 +4,7 @@
 
 ## 역할
 
-- Supabase Realtime 또는 RDS polling으로 `memories`, `intervention_feedback` 이벤트 처리
+- RDS polling으로 `memories`, `intervention_feedback` 이벤트 처리
 - 개입 규칙 판단
 - AI 또는 템플릿 기반 메시지 생성
 - 주기적으로 처리되지 않은 감정 기록 재점검
@@ -13,11 +13,16 @@
 ## 필수 환경변수
 
 ```env
-SUPABASE_URL=
-SUPABASE_SERVICE_KEY=
-WORKER_DATA_PROVIDER=supabase
+WORKER_DATA_PROVIDER=rds
+DB_HOST=
+DB_PORT=5432
+DB_NAME=postgres
+DB_USER=
+DB_PASSWORD=
+DATABASE_SSL=true
+MEMORY_TEXT_ENCRYPTION_KEY=
 PORT=8000
-LLM_PROVIDER=ollama
+LLM_PROVIDER=openai
 ```
 
 선택 환경변수:
@@ -27,17 +32,10 @@ OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
 OLLAMA_BASE_URL=
 OLLAMA_MODEL=
-DB_HOST=
-DB_PORT=5432
-DB_NAME=postgres
-DB_USER=postgres
-DB_PASSWORD=
-DATABASE_SSL=true
 DB_POOL_MAX_SIZE=2
 ```
 
-`WORKER_DATA_PROVIDER=rds`로 설정하면 Supabase Realtime 구독을 사용하지 않고
-RDS PostgreSQL의 `processed=false` 기록을 주기적으로 polling해서 처리합니다.
+현재 워커는 RDS PostgreSQL의 `processed=false` 기록을 주기적으로 polling해서 처리합니다.
 이 모드는 SQS/EventBridge 전환 전 단계의 AWS 배포용 호환 모드입니다.
 
 ## 로컬 실행
@@ -76,17 +74,6 @@ docker build -f service/Dockerfile -t moodot-ai-worker .
 ```
 
 컨테이너 실행:
-
-```bash
-docker run --rm -p 8000:8000 \
-  -e SUPABASE_URL=... \
-  -e SUPABASE_SERVICE_KEY=... \
-  -e LLM_PROVIDER=openai \
-  -e OPENAI_API_KEY=... \
-  moodot-ai-worker
-```
-
-RDS polling 모드:
 
 ```bash
 docker run --rm -p 8000:8000 \

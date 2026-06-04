@@ -18,7 +18,7 @@ flowchart LR
     BE --> CG["Cognito"]
     BE --> RDS["RDS PostgreSQL"]
     BE --> S3["S3 memory images"]
-    AI["AI Worker: Python service"] --> SB["Supabase Realtime / remaining intervention data"]
+    AI["AI Worker: Python service"] --> RDS
 ```
 
 At runtime, the frontend and backend are managed as separate PM2 processes:
@@ -48,7 +48,7 @@ instead of:
 Frontend -> Supabase directly
 ```
 
-The remaining Supabase path is mainly the AI intervention workflow and compatibility fallback code.
+Supabase is no longer part of the active production path.
 
 ## 3. Runtime ports
 
@@ -74,14 +74,9 @@ PM2 process names:
 Frontend / backend runtime currently depend on these core variables:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
 MEMORY_TEXT_ENCRYPTION_KEY=
 NEXT_PUBLIC_API_BASE_URL=
 FRONTEND_ORIGIN=
-NEXT_PUBLIC_AUTH_PROVIDER=
-AUTH_PROVIDER=
 NEXT_PUBLIC_COGNITO_DOMAIN=
 NEXT_PUBLIC_COGNITO_CLIENT_ID=
 COGNITO_DOMAIN=
@@ -104,7 +99,7 @@ Notes:
 - `FRONTEND_ORIGIN` must match the frontend origin allowed by the backend CORS config.
 - `MEMORY_TEXT_ENCRYPTION_KEY` is required for encrypted memory text read/write.
 - In production, `NEXT_PUBLIC_API_BASE_URL=https://mood-ot.com` and Nginx proxies API traffic to the Express backend.
-- `S3_BUCKET` and `S3_REGION` enable S3 uploads. Without them, the backend falls back to Supabase Storage.
+- `S3_BUCKET` and `S3_REGION` enable S3 uploads.
 
 ## 5. CI workflow split
 
@@ -121,11 +116,10 @@ The architecture is in a strong "phase 1 complete" state, but not fully finished
 
 Remaining candidates:
 
-- Deploy and verify the RDS SQL path for `interventions` and `intervention_feedback`.
-- Deploy AI worker through ECS or another isolated runtime
-- Verify AI Worker RDS polling mode against the deployed RDS database.
-- Replace AI Worker Supabase Realtime dependency with SQS/EventBridge or another AWS-native event path.
-- Add production deployment steps to the new CI workflows
+- Replace AI Worker RDS polling with SQS/EventBridge or another AWS-native event path.
+- Add deeper multi-user integration tests against a temporary database.
+- Improve new-user onboarding and profile UX.
+- Add production deployment steps to the CI workflows.
 
 ## 7. Verification completed
 
@@ -134,6 +128,8 @@ The following checks have already been verified during deployment work:
 - frontend and backend run independently on EC2
 - Cognito Hosted UI and Google login work on `https://mood-ot.com`
 - `memories` and `collections` persist through RDS PostgreSQL
+- `interventions` persist through RDS PostgreSQL
+- AI Worker RDS polling mode runs under PM2 as `moodot-ai-worker`
 - new image uploads persist to S3 bucket `moodot-memory-images-jungho-2026`
 - image signed URL retrieval works on memory detail pages
 - PM2 auto-start restores both processes after EC2 reboot
@@ -146,4 +142,4 @@ This split improves:
 - maintainability: UI and API responsibilities are clearer
 - deployability: frontend and backend can be restarted independently
 - portfolio value: the project shows explicit FE/BE/AI separation instead of a single bundled app
-- future migration flexibility: Supabase can remain as the data platform while the app logic moves into our own backend
+- future migration flexibility: AI events can move from polling to queue-based delivery without changing the user-facing API
