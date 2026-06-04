@@ -341,15 +341,87 @@ RDS/EC2를 필요할 때 켜고, 안 쓸 때 끄는 명령어는 아래 문서�
 
 - `docs/aws-cost-operations.md`
 
+## 2026-06-04 로그인/프로필 사용자 정보 개선
+
+### 로그인 계정 선택 문제 해결
+
+- 증상:
+  - 로그아웃 후 다시 로그인할 때 Google 계정 선택 화면이 나오지 않고 최근 계정으로 바로 로그인됨
+- 조치:
+  - Cognito Hosted UI authorize URL의 `prompt`를 `login select_account`로 변경
+  - 커밋:
+    - `696eaf2 fix: force account selection on cognito login`
+- 배포/검증:
+  - EC2에 최신 커밋 반영
+  - `npm run build` 성공
+  - `moodot-fe` PM2 재시작 완료
+  - 사이트에서 로그아웃 후 재로그인 시 Google 계정 선택 화면 정상 확인
+
+### 프로필 사용자 정보 반영
+
+- 증상:
+  - 프로필 화면에서 이름이 `Google 사용자` 또는 `google_102...` 형태로 표시됨
+- 원인:
+  - Cognito Google Identity Provider attribute mapping이 `username <- sub`만 설정되어 있었음
+  - Cognito 사용자 속성에 `email`, `name`, `picture`가 저장되지 않았음
+- 코드 조치:
+  - `lib/auth.ts`에서 Cognito `/oauth2/userInfo`를 추가 조회하도록 보강
+  - ID 토큰에 정보가 부족해도 access token으로 사용자 정보를 가져와 프로필에 반영
+  - 표시 이름 fallback 순서:
+    - `name`
+    - `given_name + family_name`
+    - `nickname`
+    - `preferred_username`
+    - 이메일 앞부분
+  - 커밋:
+    - `a42ed4e fix: hydrate cognito profile from userinfo`
+- AWS Cognito 설정 조치:
+  - User Pool:
+    - `User pool - tl-myz`
+    - `ap-northeast-2_YmLbFvNSA`
+  - Google attribute mapping 수정 완료:
+
+```txt
+username <- sub
+email    <- email
+name     <- name
+picture  <- picture
+```
+
+- 검증 완료:
+  - 로그아웃 후 다시 로그인
+  - 프로필에서 사용자 이름 반영 확인
+  - 여러 Google 계정 로그인 테스트
+  - 사용자별 프로필 정보 반영 확인
+  - 사용자별 기록 분리 확인
+
+### Cognito 사용자 확인 위치
+
+AWS 콘솔:
+
+1. Cognito
+2. User pools
+3. `User pool - tl-myz`
+4. Users
+
+로컬 맥 터미널:
+
+```bash
+aws cognito-idp list-users \
+  --region ap-northeast-2 \
+  --user-pool-id ap-northeast-2_YmLbFvNSA
+```
+
 ## 다음으로 할 일
 
 Supabase 이관은 완료됨. 남은 후보 작업:
 
-1. **비용 절감 운영 테스트** — RDS 시작/중지, EC2 시작/중지 절차를 실제로 한 번씩 확인
-2. **로그인 계정 선택 문제 배포** — `prompt=login select_account` 변경사항 커밋/배포 후 재로그인 테스트
-3. **SQS/EventBridge 전환** — AI Worker 이벤트 흐름 고도화 (현재 RDS polling으로 임시 대체 중)
-4. **OpenAI 크레딧 충전** — AI Worker LLM 메시지 생성 정상 동작 확인
-5. **신규 기능 개발**
+1. **비용 절감 운영 유지** — 테스트가 끝나면 EC2/RDS를 중지해서 비용 관리
+2. **신규 사용자 온보딩/프로필 UX 개선** — 이름/이메일/프로필 이미지 표시 범위 확대
+3. **사용자별 기록/컬렉션 분리 테스트 자동화** — 다중 사용자 회귀 테스트 보강
+4. **SQS/EventBridge 전환** — AI Worker 이벤트 흐름 고도화 (현재 RDS polling으로 임시 대체 중)
+5. **OpenAI 크레딧 충전** — AI Worker LLM 메시지 생성 정상 동작 확인
+6. **신규 기능 개발**
 
 ## Claude Code 요청 문구
 
