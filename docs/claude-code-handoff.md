@@ -412,13 +412,38 @@ aws cognito-idp list-users \
   --user-pool-id ap-northeast-2_YmLbFvNSA
 ```
 
+## 2026-06-04 사용자별 요청 테스트 보강
+
+### 인증 요청 테스트 추가
+
+- 목적:
+  - 여러 사용자가 로그인했을 때 기록/컬렉션 요청이 각자의 Cognito access token을 포함하는지 자동 확인
+  - 사용자별 데이터 분리의 프론트 서비스 요청 기반을 회귀 테스트로 보호
+- 변경:
+  - 기존 `tests/memory-archives/memory-service.test.ts`의 Supabase mock 제거
+  - Cognito `getAccessToken` mock 기반으로 테스트 정리
+  - `Authorization: Bearer ...` 헤더 포함 여부 테스트 추가
+  - `tests/memory-archives/collection-service.test.ts` 추가
+- 검증한 서비스:
+  - `getMemories`
+  - `getMemoryById`
+  - `getCollections`
+  - `getAvailableMemories`
+  - `createCollection`
+- 검증 결과:
+  - `npm run test:memory-archives` 통과
+  - `5 files / 19 tests passed`
+  - `npm run build` 통과
+- 커밋:
+  - `a743c53 test: cover authenticated archive service requests`
+
 ## 다음으로 할 일
 
 Supabase 이관은 완료됨. 남은 후보 작업:
 
 1. **비용 절감 운영 유지** — 테스트가 끝나면 EC2/RDS를 중지해서 비용 관리
 2. **신규 사용자 온보딩/프로필 UX 개선** — 이름/이메일/프로필 이미지 표시 범위 확대
-3. **사용자별 기록/컬렉션 분리 테스트 자동화** — 다중 사용자 회귀 테스트 보강
+3. **사용자별 기록/컬렉션 통합 테스트 후보** — RDS를 켠 상태에서 실제 DB 격리 테스트 추가 검토
 4. **SQS/EventBridge 전환** — AI Worker 이벤트 흐름 고도화 (현재 RDS polling으로 임시 대체 중)
 5. **OpenAI 크레딧 충전** — AI Worker LLM 메시지 생성 정상 동작 확인
 6. **신규 기능 개발**
