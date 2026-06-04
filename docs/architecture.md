@@ -18,7 +18,9 @@ flowchart LR
     BE --> CG["Cognito"]
     BE --> RDS["RDS PostgreSQL"]
     BE --> S3["S3 memory images"]
-    AI["AI Worker: Python service"] --> RDS
+    BE --> SQS["SQS memory.created events"]
+    SQS -. "next step" .-> AI["AI Worker: Python service"]
+    AI --> RDS
 ```
 
 At runtime, the frontend and backend are managed as separate PM2 processes:
@@ -91,6 +93,8 @@ DB_PASSWORD=
 DATABASE_SSL=
 S3_BUCKET=
 S3_REGION=
+AI_EVENT_QUEUE_URL=
+SQS_REGION=
 ```
 
 Notes:
@@ -100,6 +104,8 @@ Notes:
 - `MEMORY_TEXT_ENCRYPTION_KEY` is required for encrypted memory text read/write.
 - In production, `NEXT_PUBLIC_API_BASE_URL=https://mood-ot.com` and Nginx proxies API traffic to the Express backend.
 - `S3_BUCKET` and `S3_REGION` enable S3 uploads.
+- `AI_EVENT_QUEUE_URL` and `SQS_REGION` enable backend enqueue for new memory events.
+  If the queue URL is empty, the backend skips SQS and the current RDS polling worker still works.
 
 ## 5. CI workflow split
 
@@ -116,7 +122,7 @@ The architecture is in a strong "phase 1 complete" state, but not fully finished
 
 Remaining candidates:
 
-- Replace AI Worker RDS polling with SQS/EventBridge or another AWS-native event path.
+- Add AI Worker SQS consumption and keep RDS polling as a recovery fallback.
 - Add deeper multi-user integration tests against a temporary database.
 - Improve new-user onboarding and profile UX.
 - Add production deployment steps to the CI workflows.

@@ -455,6 +455,70 @@ aws cognito-idp list-users \
   - `service/README.md`에서 Supabase Realtime 관련 오래된 문구 제거
   - `docs/architecture.md`를 현재 Cognito/RDS/S3/PM2 구조에 맞게 갱신
 
+## 2026-06-04 SQS 이벤트 큐 생성 및 backend enqueue 추가
+
+### AWS 리소스
+
+- SQS main queue 생성 완료:
+  - `moodot-ai-worker-events`
+  - URL: `https://sqs.ap-northeast-2.amazonaws.com/355222350664/moodot-ai-worker-events`
+  - ARN: `arn:aws:sqs:ap-northeast-2:355222350664:moodot-ai-worker-events`
+  - Visibility timeout: `120`
+  - Long polling wait time: `20`
+- SQS DLQ 생성 완료:
+  - `moodot-ai-worker-events-dlq`
+  - ARN: `arn:aws:sqs:ap-northeast-2:355222350664:moodot-ai-worker-events-dlq`
+  - Message retention: `1209600` seconds
+- main queue redrive policy:
+  - max receive count: `5`
+  - 실패 메시지는 DLQ로 이동
+- EC2 IAM Role `MoodotEc2S3Role`에 inline policy 추가 완료:
+  - `MoodotSqsAiWorkerEvents`
+  - 허용 action:
+    - `sqs:SendMessage`
+    - `sqs:ReceiveMessage`
+    - `sqs:DeleteMessage`
+    - `sqs:ChangeMessageVisibility`
+    - `sqs:GetQueueAttributes`
+
+### backend 코드
+
+- `backend`에 `@aws-sdk/client-sqs` 의존성 추가
+- `backend/src/lib/ai-events.ts` 추가
+  - `AI_EVENT_QUEUE_URL` 또는 `SQS_QUEUE_URL`이 있으면 SQS로 이벤트 전송
+  - region은 `SQS_REGION`, `AWS_REGION`, `COGNITO_REGION` 순서로 사용
+  - queue URL이 없으면 조용히 skip
+- `backend/src/routes/memories.ts`
+  - memory insert 후 `id`, `created_at`을 받아 `memory.created` 이벤트 전송
+  - SQS 전송 실패는 사용자 요청 실패로 만들지 않고 backend warning log만 남김
+  - RDS polling fallback이 남아 있으므로 큐 전송 실패 시에도 나중에 처리 가능
+
+### 필요한 EC2 backend `.env` 추가 후보
+
+EC2/RDS를 다시 켜서 배포할 때 `backend/.env`에 추가:
+
+```env
+AI_EVENT_QUEUE_URL=https://sqs.ap-northeast-2.amazonaws.com/355222350664/moodot-ai-worker-events
+SQS_REGION=ap-northeast-2
+```
+
+반영 후 EC2 터미널:
+
+```bash
+cd ~/Moodot-cloud/backend
+npm install
+npm run build
+pm2 restart moodot-be --update-env
+pm2 save
+```
+
+### 남은 작업
+
+- AI Worker가 SQS에서 `memory.created` 메시지를 읽고 처리하는 consume 구현
+- Worker 처리 성공 시 SQS message delete
+- Worker 실패 시 message를 삭제하지 않아 재시도/DLQ로 이동하는 흐름 검증
+- 비용 절감 모드에서는 EC2/RDS가 꺼져 있으므로 실제 배포 검증은 서버를 켤 때 진행
+
 ## 다음으로 할 일
 
 Supabase 이관은 완료됨. 남은 후보 작업:
@@ -462,7 +526,7 @@ Supabase 이관은 완료됨. 남은 후보 작업:
 1. **비용 절감 운영 유지** — 테스트가 끝나면 EC2/RDS를 중지해서 비용 관리
 2. **신규 사용자 온보딩/프로필 UX 개선** — 이름/이메일/프로필 이미지 표시 범위 확대
 3. **사용자별 기록/컬렉션 통합 테스트 후보** — RDS를 켠 상태에서 실제 DB 격리 테스트 추가 검토
-4. **SQS/EventBridge 구현** — 계획 문서 기준으로 SQS 리소스 생성, backend enqueue, Worker consume 구현
+4. **SQS Worker consume 구현** — 생성된 SQS queue를 AI Worker가 읽고 처리하도록 연결
 5. **OpenAI 크레딧 충전** — AI Worker LLM 메시지 생성 정상 동작 확인
 6. **신규 기능 개발**
 

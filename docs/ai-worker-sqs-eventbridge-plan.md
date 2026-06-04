@@ -31,6 +31,14 @@ AI Worker -> SQS long polling -> Pipeline -> RDS interventions insert
 AI Worker -> RDS processed=true update
 ```
 
+2026-06-04 기준 진행 상태:
+
+- SQS queue/DLQ 생성 완료
+- EC2 IAM Role에 SQS 권한 추가 완료
+- backend memory 생성 후 SQS enqueue 코드 추가 완료
+- AI Worker SQS consume 구현은 다음 단계
+- RDS polling fallback은 계속 유지
+
 EventBridge를 함께 쓰는 경우:
 
 ```text
@@ -90,16 +98,21 @@ EventBridge는 이벤트 종류가 늘어날 때 도입하는 편이 좋습니�
 ### SQS
 
 - Queue name: `moodot-ai-worker-events`
+- Queue URL: `https://sqs.ap-northeast-2.amazonaws.com/355222350664/moodot-ai-worker-events`
 - Type: Standard queue
-- Visibility timeout: 60-120초부터 시작
-- Message retention: 4일 기본값 유지 가능
+- Visibility timeout: 120초
+- Receive message wait time: 20초
+- Message retention: 4일 기본값
 - Dead-letter queue:
   - `moodot-ai-worker-events-dlq`
-  - max receive count: 3-5
+  - ARN: `arn:aws:sqs:ap-northeast-2:355222350664:moodot-ai-worker-events-dlq`
+  - max receive count: 5
+  - message retention: 14일
 
 ### IAM
 
-EC2 IAM Role `MoodotEc2S3Role`에 아래 권한 추가 후보:
+EC2 IAM Role `MoodotEc2S3Role`에 inline policy
+`MoodotSqsAiWorkerEvents` 추가 완료:
 
 ```json
 {
@@ -111,11 +124,12 @@ EC2 IAM Role `MoodotEc2S3Role`에 아래 권한 추가 후보:
     "sqs:ChangeMessageVisibility",
     "sqs:GetQueueAttributes"
   ],
-  "Resource": "arn:aws:sqs:ap-northeast-2:<account-id>:moodot-ai-worker-events"
+  "Resource": [
+    "arn:aws:sqs:ap-northeast-2:355222350664:moodot-ai-worker-events",
+    "arn:aws:sqs:ap-northeast-2:355222350664:moodot-ai-worker-events-dlq"
+  ]
 }
 ```
-
-DLQ 조회/운영이 필요하면 DLQ ARN도 별도로 추가합니다.
 
 ## 코드 변경 방향
 
@@ -134,8 +148,8 @@ DLQ 조회/운영이 필요하면 DLQ ARN도 별도로 추가합니다.
 환경변수 후보:
 
 ```env
-AI_EVENT_QUEUE_URL=
-AWS_REGION=ap-northeast-2
+AI_EVENT_QUEUE_URL=https://sqs.ap-northeast-2.amazonaws.com/355222350664/moodot-ai-worker-events
+SQS_REGION=ap-northeast-2
 ```
 
 ### service

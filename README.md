@@ -28,6 +28,10 @@ The app now follows this primary request flow in the EC2 practice deployment:
 Browser -> Nginx HTTPS -> Next.js frontend -> Express backend -> RDS PostgreSQL
 ```
 
+New memory creation can also enqueue a lightweight `memory.created` event to SQS
+when the backend has `AI_EVENT_QUEUE_URL` configured. The AI Worker still keeps
+RDS polling as a fallback until SQS consumption is implemented.
+
 ## Local development
 
 Install root dependencies:
@@ -84,11 +88,8 @@ DB_PASSWORD=
 DATABASE_SSL=
 S3_BUCKET=
 S3_REGION=
-
-# Still required for Supabase fallback / remaining AI intervention paths.
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+AI_EVENT_QUEUE_URL=
+SQS_REGION=
 ```
 
 See [docs/architecture.md](/Users/jungho/Moodot-cloud/docs/architecture.md) for

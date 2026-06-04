@@ -10,6 +10,7 @@ import {
 import { encryptMemoryText } from "../lib/memory-text-crypto.js"
 import { getPostgresPool } from "../lib/postgres.js"
 import { getAuthenticatedUser } from "../lib/auth.js"
+import { publishMemoryCreatedEvent } from "../lib/ai-events.js"
 
 type CreateMemoryInput = {
   title: string | null
@@ -114,7 +115,7 @@ memoriesRouter.post("/", async (request, response, next) => {
     const user = await getAuthenticatedUser(request)
     const input = request.body as CreateMemoryInput
 
-    const { rows } = await getPostgresPool().query<{ id: number }>(
+    const { rows } = await getPostgresPool().query<{ id: number; created_at: string }>(
       `
         insert into public.memories (
           user_id,
@@ -133,12 +134,25 @@ memoriesRouter.post("/", async (request, response, next) => {
           text_key_version
         )
         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-        returning id
+        returning id, created_at
       `,
       [user.id, ...buildMemoryValues(input)],
     )
 
-    response.json({ id: rows[0]?.id })
+    const createdMemory = rows[0]
+
+    if (createdMemory) {
+      publishMemoryCreatedEvent({
+        type: "memory.created",
+        memory_id: createdMemory.id,
+        user_id: user.id,
+        created_at: createdMemory.created_at,
+      }).catch((error) => {
+        console.warn("[ai-events] memory.created publish failed:", error)
+      })
+    }
+
+    response.json({ id: createdMemory?.id })
   } catch (error) {
     next(error)
   }
