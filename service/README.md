@@ -106,3 +106,4 @@ docker run --rm -p 8000:8000 \
 - FE/BE 배포와 분리해서 `service/**` 변경 시에만 별도 파이프라인을 타도록 구성하는 것이 좋습니다.
 
 Lambda 전환 작업 메모는 [docs/ai-worker-lambda-migration.md](/Users/jungho/Moodot-cloud/docs/ai-worker-lambda-migration.md)에 정리했습니다.
+로컬에서 Lambda 업로드용 zip을 만들려면 `./service/build_lambda_package.sh`를 실행하면 됩니다.

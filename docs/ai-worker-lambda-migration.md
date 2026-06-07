@@ -59,6 +59,24 @@ Lambda가 RDS에 붙으려면 아래가 필요합니다.
 즉, Lambda 함수만 만드는 것으로 끝나지 않습니다.
 `VPC / subnet / security group` 연결이 가장 중요한 부분입니다.
 
+현재 Moodot AWS에서 확인한 값:
+
+- VPC: `vpc-0af82ef9795226607`
+- EC2 subnet: `subnet-096bccf9e9fbfc4b5`
+- RDS subnet group:
+  - `subnet-02657190619de69c9`
+  - `subnet-0c727ecc273854028`
+  - `subnet-0b928decb88679421`
+  - `subnet-096bccf9e9fbfc4b5`
+- EC2 security group: `sg-0b30299bcbe9d128d`
+- RDS security group: `sg-0f4e2af71015e83a9`
+
+주의:
+
+- RDS security group이 현재 꽤 넓게 열려 있습니다.
+- Lambda를 빨리 붙이는 것 자체는 가능하지만, 장기적으로는 Lambda 전용 security group을 따로 만들고
+  RDS inbound를 `5432`만 허용하는 식으로 좁히는 것이 좋습니다.
+
 ## 필요한 환경변수
 
 Lambda에 넣을 값:
@@ -104,7 +122,17 @@ SQS_MAX_MESSAGES=5
 - `service/` 내부 코드 전체
 - 의존성 설치 결과물
 
-가장 단순한 방식은 별도 build 디렉터리에 `pip install -r requirements.txt -t .` 후 zip으로 묶는 방식입니다.
+레포에 준비된 스크립트:
+
+```bash
+./service/build_lambda_package.sh
+```
+
+생성 결과:
+
+- zip 파일: `service/dist-lambda/moodot-ai-worker-lambda.zip`
+
+이 zip을 Lambda 코드 업로드에 사용하면 됩니다.
 
 ### 3. VPC 연결
 
@@ -112,9 +140,19 @@ SQS_MAX_MESSAGES=5
 
 - Lambda 함수 설정
 - VPC
-- RDS와 같은 VPC 선택
-- private subnet 선택
+- RDS와 같은 VPC `vpc-0af82ef9795226607` 선택
+- RDS subnet group 안의 subnet 선택
 - Lambda용 security group 선택 또는 생성
+
+처음엔 빠르게 테스트하려면:
+
+- 기존 RDS subnet group에 포함된 subnet 2개 이상 선택
+- security group은 새로 만드는 것을 권장
+
+예시 방향:
+
+- Lambda SG: outbound all
+- RDS SG inbound: `tcp 5432` from Lambda SG
 
 ### 4. IAM Role 확인
 
@@ -165,3 +203,5 @@ AWS 콘솔에서 직접 확인/선택이 필요한 부분:
 - 업로드 스크립트 만들기
 - Lambda용 build/deploy 문서 보강
 - PM2 Worker를 Lambda 전환 후 어떻게 끌지 운영 순서 정리
+
+현재 이 문서 기준으로는 zip 생성 스크립트까지 준비된 상태입니다.

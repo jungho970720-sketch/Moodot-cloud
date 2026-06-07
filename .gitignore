@@ -53,5 +53,6 @@ next-env.d.ts
 # python / AI service
 service/venv/
 service/docs/
+service/dist-lambda/
 **/__pycache__/
 **/*.pyc
