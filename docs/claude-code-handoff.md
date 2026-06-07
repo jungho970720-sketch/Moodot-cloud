@@ -649,6 +649,50 @@ python3 -m pytest service/tests/test_sqs_events.py service/tests/test_units_rule
 - 실제 사이트에서 사용자가 새 기록을 작성했을 때 backend가 SQS message를 enqueue하는 사용자 경로 확인
 - 테스트 후 비용 절감을 위해 EC2/RDS를 다시 중지할지 결정
 
+## 2026-06-07 AI Worker Lambda 전환 준비
+
+### 코드 추가
+
+- `service/runtime.py`
+  - RDS store / rule engine / message generator 공통 초기화 분리
+- `service/lambda_handler.py`
+  - Lambda SQS event entrypoint 추가
+  - handler: `lambda_handler.handler`
+  - 실패한 message만 `batchItemFailures`로 반환
+- `service/events/sqs.py`
+  - Lambda SQS record 처리용 `handle_lambda_record()` 추가
+- `service/main.py`
+  - 기존 PM2 장기 실행 경로는 유지
+  - 공통 초기화는 `runtime.py`를 사용하도록 정리
+- 테스트 추가:
+  - `service/tests/test_lambda_handler.py`
+
+### 로컬 검증
+
+```bash
+python3 -m compileall service
+python3 -m pytest service/tests/test_lambda_handler.py service/tests/test_sqs_events.py service/tests/test_units_rules.py service/tests/test_rule_engine.py
+```
+
+결과:
+
+- 18 passed
+
+### 문서 추가
+
+- `docs/ai-worker-lambda-migration.md`
+  - 현재 PM2 Worker -> Lambda 전환 시 바뀌는 흐름
+  - Lambda handler 경로
+  - 필요한 env
+  - Lambda가 RDS에 붙기 위한 VPC/subnet/security group 조건
+  - AWS 콘솔에서 사용자가 직접 확인해야 하는 항목
+
+### 현재 상태
+
+- 코드상으로는 Lambda handler 준비 완료
+- 아직 실제 Lambda 함수 생성/업로드/VPC 연결/SQS trigger 연결은 안 함
+- 다음 단계는 AWS 콘솔에서 Lambda 함수 생성 후 배포 package 업로드 준비
+
 ## 다음으로 할 일
 
 Supabase 이관은 완료됨. 남은 후보 작업:
@@ -656,7 +700,7 @@ Supabase 이관은 완료됨. 남은 후보 작업:
 1. **비용 절감 운영 유지** — 테스트가 끝나면 EC2/RDS를 중지해서 비용 관리
 2. **신규 사용자 온보딩/프로필 UX 개선** — 이름/이메일/프로필 이미지 표시 범위 확대
 3. **사용자별 기록/컬렉션 통합 테스트 후보** — RDS를 켠 상태에서 실제 DB 격리 테스트 추가 검토
-4. **실제 사용자 경로 SQS 확인** — 사이트에서 새 기록 작성 후 backend enqueue와 Worker consume 로그 확인
+4. **AI Worker Lambda 배포 준비** — Lambda 함수 생성, VPC 연결, zip 배포 방식 정리
 5. **OpenAI 크레딧 충전** — AI Worker LLM 메시지 생성 정상 동작 확인
 6. **신규 기능 개발**
 

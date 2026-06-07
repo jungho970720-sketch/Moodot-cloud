@@ -93,6 +93,13 @@ class SqsEventConsumer:
             await self._delete_message(message["ReceiptHandle"])
         return should_delete
 
+    async def handle_lambda_record(self, record: Dict[str, Any]) -> bool:
+        message = {
+            "Body": record.get("body"),
+            "ReceiptHandle": record.get("receiptHandle"),
+        }
+        return await self._process_message(message)
+
     async def _process_message(self, message: Dict[str, Any]) -> bool:
         event = self._parse_body(message.get("Body"))
         if not event:

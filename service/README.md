@@ -100,5 +100,9 @@ docker run --rm -p 8000:8000 \
 - 현재 워커는 단일 프로세스 장기 실행 방식입니다.
 - SQS 모드는 `moodot-ai-worker-events` 큐에서 메시지를 읽고, 성공 시 메시지를 삭제합니다.
 - 처리 실패 시 메시지를 삭제하지 않아 SQS 재시도/DLQ 흐름을 사용합니다.
+- Lambda 전환 시 엔트리포인트는 `service/lambda_handler.handler`를 사용합니다.
+- Lambda의 SQS event source mapping은 partial batch response를 사용하도록 두는 것이 좋습니다.
 - ECS로 올릴 경우 health check는 `PORT` 기반 HTTP 응답을 사용하면 됩니다.
 - FE/BE 배포와 분리해서 `service/**` 변경 시에만 별도 파이프라인을 타도록 구성하는 것이 좋습니다.
+
+Lambda 전환 작업 메모는 [docs/ai-worker-lambda-migration.md](/Users/jungho/Moodot-cloud/docs/ai-worker-lambda-migration.md)에 정리했습니다.
