@@ -14,10 +14,14 @@ def load_worker_env() -> None:
 
 
 def configure_logging() -> None:
+    level = os.getenv("LOG_LEVEL", "INFO").upper()
     logging.basicConfig(
-        level=os.getenv("LOG_LEVEL", "INFO").upper(),
+        level=level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
+    # Lambda runtime pre-configures the root logger, so basicConfig() is a no-op.
+    # Force the level directly so LOG_LEVEL env var is respected in Lambda.
+    logging.getLogger().setLevel(level)
 
 
 @dataclass
