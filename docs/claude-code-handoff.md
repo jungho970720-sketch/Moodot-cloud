@@ -274,13 +274,20 @@ Supabase → AWS 이관이 완료됨. 코드와 패키지에서 Supabase 의존�
 #### FE (Next.js)
 
 - `app/api/memories/route.ts`, `app/api/memories/[id]/route.ts`, `app/api/memories/texts/route.ts`: 삭제 (프로덕션에서 사용하지 않는 FE API Route)
-- `lib/supabase/auth.ts`: Cognito 전용으로 단순화, Supabase auth 분기 전부 제거
+- `lib/supabase/auth.ts` → `lib/auth.ts`로 이동: Cognito 전용으로 단순화, Supabase auth 분기 전부 제거
+- `lib/supabase/calendar-records.ts` → `lib/calendar-records.ts`로 이동: 불필요한 Supabase 환경변수 체크 제거
 - `lib/supabase/client.ts`, `lib/supabase/server.ts`: 삭제 (미사용)
-- `lib/supabase/calendar-records.ts`: 불필요한 Supabase 환경변수 체크 제거
 - `app/auth/callback/route.ts`: Supabase callback 경로 제거, Cognito 전용
-- `components/layout/auth-init.tsx`: 익명 유저 초기화/병합 로직 제거
-- `lib/services/memory.ts`, `lib/services/collection.ts`, `lib/storage/image.ts`: `signInAnonymously`, `getCurrentUser` 호출 제거
+- `components/layout/auth-init.tsx`: 익명 유저 초기화/병합 로직 제거 (빈 컴포넌트로 단순화)
+- `lib/services/memory.ts`, `lib/services/collection.ts`, `lib/storage/image.ts`: `signInAnonymously`, `getCurrentUser` 호출 제거, import를 `@/lib/auth`로 변경
+- `next.config.ts`: `remotePatterns`에서 `*.supabase.co` 제거, `*.amazonaws.com` 추가
 - `package.json`: `@supabase/ssr`, `@supabase/supabase-js` 제거
+
+#### backend (Express)
+
+- `backend/src/lib/supabase.ts` → `backend/src/lib/auth.ts`로 이름 변경: Cognito 전용 `getAuthenticatedUser`, `HttpError`만 남김
+- `backend/src/index.ts`: import를 `./lib/auth.js`로 변경
+- `backend/package.json`: `@supabase/supabase-js` 제거
 
 ### 현재 서비스 구조
 
@@ -347,10 +354,14 @@ RDS/EC2를 필요할 때 켜고, 안 쓸 때 끄는 명령어는 아래 문서�
 
 - 증상:
   - 로그아웃 후 다시 로그인할 때 Google 계정 선택 화면이 나오지 않고 최근 계정으로 바로 로그인됨
-- 조치:
+- 1차 조치:
   - Cognito Hosted UI authorize URL의 `prompt`를 `login select_account`로 변경
-  - 커밋:
-    - `696eaf2 fix: force account selection on cognito login`
+  - 커밋: `696eaf2 fix: force account selection on cognito login`
+- 근본 원인 발견 및 2차 조치:
+  - `app/profile/page.tsx`에서 `signOut()` 호출 후 `router.push("/login")`와 `router.refresh()`를 추가로 호출하고 있었음
+  - 이로 인해 Cognito `/logout` 엔드포인트의 서버사이드 세션 초기화 리다이렉트가 가로막혀 세션이 실제로 클리어되지 않은 것이 원인
+  - `router.push("/login")`와 `router.refresh()` 제거 → `signOut()`이 Cognito `/logout`으로 정상 리다이렉트하도록 허용
+  - 커밋: `fix: remove router.push after signOut to allow cognito session clearance`
 - 배포/검증:
   - EC2에 최신 커밋 반영
   - `npm run build` 성공
@@ -693,16 +704,35 @@ python3 -m pytest service/tests/test_lambda_handler.py service/tests/test_sqs_ev
 - 아직 실제 Lambda 함수 생성/업로드/VPC 연결/SQS trigger 연결은 안 함
 - 다음 단계는 AWS 콘솔에서 Lambda 함수 생성 후 배포 package 업로드 준비
 
+## 2026-06-07 Lambda 전환 완료
+
+### AI Worker Lambda 최종 검증
+
+- Lambda → RDS 연결, OpenAI 초기화, SQS 메시지 처리, 규칙 엔진 동작 전부 CloudWatch 로그로 확인
+- DB `public.interventions`에 Lambda가 생성한 row 확인 (`id=4, reason=positive_reinforcement, status=shown`)
+- PM2 `moodot-ai-worker` 중지 및 삭제 완료 → Lambda가 완전 대체
+
+### Lambda 로깅 수정
+
+- `service/runtime.py` `configure_logging()` 수정
+  - Lambda 런타임이 root logger를 미리 등록해 `basicConfig()`가 no-op가 되는 문제 해결
+  - `logging.getLogger().setLevel(level)` 추가
+  - Lambda zip 재빌드 및 재업로드 완료
+  - 커밋: `fix: force root logger level for lambda compatibility`
+
+### 현재 AI Worker 구조
+
+- Lambda `moodot-ai-worker-lambda` — SQS 트리거, 서버리스
+- EC2 PM2 Worker — 삭제 완료
+- 전체 흐름: `기록 저장 → SQS → Lambda → 규칙 엔진 → intervention 생성 → FE 표시`
+
 ## 다음으로 할 일
 
-Supabase 이관은 완료됨. 남은 후보 작업:
-
-1. **비용 절감 운영 유지** — 테스트가 끝나면 EC2/RDS를 중지해서 비용 관리
-2. **신규 사용자 온보딩/프로필 UX 개선** — 이름/이메일/프로필 이미지 표시 범위 확대
-3. **사용자별 기록/컬렉션 통합 테스트 후보** — RDS를 켠 상태에서 실제 DB 격리 테스트 추가 검토
-4. **AI Worker Lambda 배포 준비** — Lambda 함수 생성, VPC 연결, zip 배포 방식 정리
-5. **OpenAI 크레딧 충전** — AI Worker LLM 메시지 생성 정상 동작 확인
-6. **신규 기능 개발**
+1. **비용 절감** — EC2/RDS 중지 (Lambda는 서버리스라 별도 중지 불필요)
+2. **Lambda Security Group 분리** — 현재 EC2와 동일 SG 사용 중, Lambda 전용 SG 검토
+3. **신규 사용자 온보딩/프로필 UX 개선**
+4. **OpenAI 크레딧 모니터링**
+5. **신규 기능 개발**
 
 ## Claude Code 요청 문구
 
