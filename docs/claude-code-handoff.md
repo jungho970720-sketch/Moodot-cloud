@@ -578,6 +578,77 @@ python3 -m pytest service/tests/test_sqs_events.py service/tests/test_units_rule
   - 사이트에서 새 기록 생성
   - SQS message 처리, RDS `interventions`, `memories.processed=true` 확인
 
+## 2026-06-07 SQS 배포환경 통합 검증
+
+### 배포 반영
+
+- EC2/RDS 시작 상태 확인:
+  - EC2: `running`
+  - RDS: `available`
+- EC2 코드가 `a42ed4e`로 오래된 상태였음
+- EC2에서 GitHub HTTPS 인증 문제로 `git pull --ff-only` 실패:
+  - `fatal: could not read Username for 'https://github.com': No such device or address`
+- 로컬에서 git bundle 생성 후 EC2에 복사해서 fast-forward merge로 최신화:
+  - 최신 커밋: `56116ea feat: consume memory events from sqs`
+- EC2 env 반영:
+  - `backend/.env`
+    - `AI_EVENT_QUEUE_URL`
+    - `SQS_REGION`
+  - `service/.env.local`
+    - `WORKER_EVENT_SOURCE=sqs`
+    - `SQS_QUEUE_URL`
+    - `SQS_REGION`
+    - `SQS_WAIT_TIME_SECONDS=20`
+    - `SQS_MAX_MESSAGES=5`
+- EC2 의존성/빌드:
+  - `npm install`
+  - `npm --prefix backend install`
+  - `cd service && python3 -m pip install --user -r requirements.txt`
+  - `npm run build`
+  - `npm --prefix backend run build`
+  - `python3 -m compileall service`
+- PM2 재시작 및 저장:
+  - `moodot-fe`
+  - `moodot-be`
+  - `moodot-ai-worker`
+  - `pm2 save`
+
+### 검증 결과
+
+- `https://mood-ot.com/health`:
+  - `{"ok":true}`
+- `https://mood-ot.com/health/db`:
+  - `{"ok":true,"db":"postgres"}`
+- `pm2 list`:
+  - `moodot-fe`, `moodot-be`, `moodot-ai-worker` 모두 online
+- AI Worker 로그:
+  - `SQS 이벤트 모드로 동작합니다. RDS polling fallback도 유지합니다.`
+  - `Found credentials from IAM Role: MoodotEc2S3Role`
+  - `SQS 이벤트 수신 시작: https://sqs.ap-northeast-2.amazonaws.com/355222350664/moodot-ai-worker-events`
+- SQS queue attributes:
+  - `ApproximateNumberOfMessages=0`
+  - `ApproximateNumberOfMessagesNotVisible=0`
+  - `ApproximateNumberOfMessagesDelayed=0`
+
+### SQS smoke test
+
+- EC2에서 임시 테스트 memory row 생성
+- SQS에 `memory.created` message 전송
+- Worker가 message를 수신해서 해당 memory를 처리
+- 확인 결과:
+
+```json
+{"memory_id":11,"processed":true,"interventions":0}
+```
+
+- 테스트용 memory/intervention 데이터는 삭제 완료
+- smoke test 후 SQS queue 대기 메시지 0개 확인
+
+### 남은 확인
+
+- 실제 사이트에서 사용자가 새 기록을 작성했을 때 backend가 SQS message를 enqueue하는 사용자 경로 확인
+- 테스트 후 비용 절감을 위해 EC2/RDS를 다시 중지할지 결정
+
 ## 다음으로 할 일
 
 Supabase 이관은 완료됨. 남은 후보 작업:
@@ -585,7 +656,7 @@ Supabase 이관은 완료됨. 남은 후보 작업:
 1. **비용 절감 운영 유지** — 테스트가 끝나면 EC2/RDS를 중지해서 비용 관리
 2. **신규 사용자 온보딩/프로필 UX 개선** — 이름/이메일/프로필 이미지 표시 범위 확대
 3. **사용자별 기록/컬렉션 통합 테스트 후보** — RDS를 켠 상태에서 실제 DB 격리 테스트 추가 검토
-4. **SQS 통합 배포 검증** — EC2/RDS를 켠 뒤 backend enqueue와 Worker consume 실제 흐름 확인
+4. **실제 사용자 경로 SQS 확인** — 사이트에서 새 기록 작성 후 backend enqueue와 Worker consume 로그 확인
 5. **OpenAI 크레딧 충전** — AI Worker LLM 메시지 생성 정상 동작 확인
 6. **신규 기능 개발**
 
