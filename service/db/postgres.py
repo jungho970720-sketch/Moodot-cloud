@@ -94,7 +94,30 @@ class WorkerPostgresStore:
             "text": text or "",
             "created_at": self._iso(item.get("created_at")),
             "user_id": item.get("user_id"),
+            "processed": item.get("processed"),
         }
+
+    async def fetch_memory_by_id(self, memory_id: int) -> Optional[Dict[str, Any]]:
+        row = await self.pool.fetchrow(
+            """
+            select
+              m.id,
+              m.emotion_id,
+              m.text,
+              m.text_ciphertext,
+              m.text_iv,
+              m.created_at,
+              m.user_id,
+              m.processed,
+              ec.emotion
+            from public.memories m
+            left join public.emotion_categories ec
+              on ec.emotion_id = m.emotion_id
+            where m.id = $1
+            """,
+            int(memory_id),
+        )
+        return self._memory_row(row) if row else None
 
     async def fetch_unprocessed_memories(
         self,

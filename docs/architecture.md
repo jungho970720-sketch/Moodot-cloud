@@ -19,7 +19,7 @@ flowchart LR
     BE --> RDS["RDS PostgreSQL"]
     BE --> S3["S3 memory images"]
     BE --> SQS["SQS memory.created events"]
-    SQS -. "next step" .-> AI["AI Worker: Python service"]
+    SQS --> AI["AI Worker: Python service"]
     AI --> RDS
 ```
 
@@ -95,6 +95,10 @@ S3_BUCKET=
 S3_REGION=
 AI_EVENT_QUEUE_URL=
 SQS_REGION=
+WORKER_EVENT_SOURCE=
+SQS_QUEUE_URL=
+SQS_WAIT_TIME_SECONDS=
+SQS_MAX_MESSAGES=
 ```
 
 Notes:
@@ -105,7 +109,9 @@ Notes:
 - In production, `NEXT_PUBLIC_API_BASE_URL=https://mood-ot.com` and Nginx proxies API traffic to the Express backend.
 - `S3_BUCKET` and `S3_REGION` enable S3 uploads.
 - `AI_EVENT_QUEUE_URL` and `SQS_REGION` enable backend enqueue for new memory events.
-  If the queue URL is empty, the backend skips SQS and the current RDS polling worker still works.
+  If the queue URL is empty, the backend skips SQS.
+- `WORKER_EVENT_SOURCE=sqs` and `SQS_QUEUE_URL` enable AI Worker queue consumption.
+  The worker still keeps RDS polling as a recovery fallback.
 
 ## 5. CI workflow split
 
@@ -122,7 +128,7 @@ The architecture is in a strong "phase 1 complete" state, but not fully finished
 
 Remaining candidates:
 
-- Add AI Worker SQS consumption and keep RDS polling as a recovery fallback.
+- Run EC2 integration verification for the backend enqueue and AI Worker SQS consume path.
 - Add deeper multi-user integration tests against a temporary database.
 - Improve new-user onboarding and profile UX.
 - Add production deployment steps to the CI workflows.

@@ -29,7 +29,7 @@ class Pipeline:
         self.rule_engine = rule_engine
         self.message_generator = message_generator
 
-    async def process_emotion(self, payload: Dict[str, Any]) -> None:
+    async def process_emotion(self, payload: Dict[str, Any]) -> bool:
         """새 감정 INSERT 이벤트 처리"""
         try:
             data = payload.get("data", payload)
@@ -56,8 +56,7 @@ class Pipeline:
 
             if not decision.get("should_intervene"):
                 logger.info(f"⏭️ 개입 불필요: {decision.get('reason')}")
-                await self._mark_as_processed(emotion["id"])
-                return
+                return await self._mark_as_processed(emotion["id"])
 
             logger.info(f"💬 개입 생성 중...")
             logger.info(f"   규칙: {decision.get('rule')}")
@@ -67,7 +66,7 @@ class Pipeline:
 
             if not self.message_generator:
                 logger.info("⏭️ LLM 미연결 — 개입 생성 생략 (미처리 상태 유지)")
-                return
+                return False
 
             context = decision.get("context", {})
             action = decide_action(context.get("feedback_avg_score"), decision["reason"])
@@ -92,13 +91,16 @@ class Pipeline:
             if intervention_id:
                 logger.info(f"✅ Intervention 생성: {intervention_id}")
                 logger.info(f"   메시지: {message}")
-                await self._mark_as_processed(emotion["id"])
+                processed = await self._mark_as_processed(emotion["id"])
                 logger.info("✅ 처리 완료\n")
+                return processed
             else:
                 logger.error("❌ Intervention 생성 실패 — 재처리 대기")
+                return False
 
         except Exception as e:
             logger.error(f"❌ 이벤트 처리 중 에러: {e}", exc_info=True)
+            return False
 
     async def process_feedback(self, payload: Dict[str, Any]) -> None:
         """피드백 INSERT 이벤트 처리 — feedback_score 갱신"""
@@ -114,12 +116,15 @@ class Pipeline:
         except Exception as e:
             logger.error(f"❌ 피드백 처리 실패: {e}", exc_info=True)
 
-    async def _mark_as_processed(self, emotion_id: str) -> None:
+    async def _mark_as_processed(self, emotion_id: str) -> bool:
         """감정 기록을 처리 완료 상태로 변경"""
         try:
             if await self.store.mark_memory_processed(emotion_id):
                 logger.debug(f"Processed 플래그 업데이트 성공: {emotion_id}")
+                return True
             else:
                 logger.warning(f"Processed 플래그 업데이트 실패: {emotion_id}")
+                return False
         except Exception as e:
             logger.error(f"❌ Processed 업데이트 실패: {e}")
+            return False

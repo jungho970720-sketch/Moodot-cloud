@@ -519,6 +519,65 @@ pm2 save
 - Worker 실패 시 message를 삭제하지 않아 재시도/DLQ로 이동하는 흐름 검증
 - 비용 절감 모드에서는 EC2/RDS가 꺼져 있으므로 실제 배포 검증은 서버를 켤 때 진행
 
+## 2026-06-07 AI Worker SQS consume 구현
+
+### service 코드
+
+- `service/events/sqs.py` 추가
+  - SQS long polling으로 `memory.created` message 수신
+  - message body JSON parse
+  - `memory_id`로 RDS memory 조회
+  - `Pipeline.process_emotion({"record": memory})` 호출
+  - 처리 성공 시 SQS message 삭제
+  - 처리 실패 시 message를 삭제하지 않아 재시도/DLQ 흐름 사용
+  - 잘못된 JSON/지원하지 않는 event type은 poison message로 보고 삭제
+  - 이미 `processed=true`인 memory는 중복 처리하지 않고 message 삭제
+- `service/db/postgres.py`
+  - `fetch_memory_by_id(memory_id)` 추가
+  - SQS message의 `memory_id`로 처리 대상 memory를 다시 조회
+- `service/agents/pipeline.py`
+  - `process_emotion()`이 성공 여부를 `bool`로 반환하도록 변경
+  - SQS consumer가 message delete 여부를 판단할 수 있게 함
+- `service/main.py`
+  - `WORKER_EVENT_SOURCE=sqs`일 때 SQS consumer 실행
+  - `initial_check`, `periodic_check` RDS polling fallback은 계속 유지
+- `service/requirements.txt`
+  - `boto3` 추가
+
+### AI Worker SQS env
+
+EC2/RDS를 다시 켜서 실제 배포 검증할 때 `service/.env.local`에 추가:
+
+```env
+WORKER_EVENT_SOURCE=sqs
+SQS_QUEUE_URL=https://sqs.ap-northeast-2.amazonaws.com/355222350664/moodot-ai-worker-events
+SQS_REGION=ap-northeast-2
+SQS_WAIT_TIME_SECONDS=20
+SQS_MAX_MESSAGES=5
+```
+
+### 로컬 검증
+
+```bash
+python3 -m compileall service
+python3 -m pytest service/tests/test_sqs_events.py service/tests/test_units_rules.py service/tests/test_rule_engine.py
+```
+
+결과:
+
+- 16 passed
+
+### 남은 작업
+
+- 비용 절감 모드 때문에 EC2/RDS를 켜지 않고 로컬 단위 검증까지만 완료
+- 실제 통합 검증은 EC2/RDS 시작 후 진행:
+  - backend `.env`에 `AI_EVENT_QUEUE_URL`, `SQS_REGION` 반영
+  - service `.env.local`에 `WORKER_EVENT_SOURCE=sqs`, `SQS_QUEUE_URL`, `SQS_REGION` 반영
+  - `npm install` / `pip install -r requirements.txt`
+  - PM2 재시작
+  - 사이트에서 새 기록 생성
+  - SQS message 처리, RDS `interventions`, `memories.processed=true` 확인
+
 ## 다음으로 할 일
 
 Supabase 이관은 완료됨. 남은 후보 작업:
@@ -526,7 +585,7 @@ Supabase 이관은 완료됨. 남은 후보 작업:
 1. **비용 절감 운영 유지** — 테스트가 끝나면 EC2/RDS를 중지해서 비용 관리
 2. **신규 사용자 온보딩/프로필 UX 개선** — 이름/이메일/프로필 이미지 표시 범위 확대
 3. **사용자별 기록/컬렉션 통합 테스트 후보** — RDS를 켠 상태에서 실제 DB 격리 테스트 추가 검토
-4. **SQS Worker consume 구현** — 생성된 SQS queue를 AI Worker가 읽고 처리하도록 연결
+4. **SQS 통합 배포 검증** — EC2/RDS를 켠 뒤 backend enqueue와 Worker consume 실제 흐름 확인
 5. **OpenAI 크레딧 충전** — AI Worker LLM 메시지 생성 정상 동작 확인
 6. **신규 기능 개발**
 

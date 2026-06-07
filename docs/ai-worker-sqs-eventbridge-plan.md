@@ -31,13 +31,14 @@ AI Worker -> SQS long polling -> Pipeline -> RDS interventions insert
 AI Worker -> RDS processed=true update
 ```
 
-2026-06-04 기준 진행 상태:
+2026-06-07 기준 진행 상태:
 
 - SQS queue/DLQ 생성 완료
 - EC2 IAM Role에 SQS 권한 추가 완료
 - backend memory 생성 후 SQS enqueue 코드 추가 완료
-- AI Worker SQS consume 구현은 다음 단계
+- AI Worker SQS consume 코드 추가 완료
 - RDS polling fallback은 계속 유지
+- EC2/RDS를 켠 뒤 실제 기록 생성 -> SQS -> Worker 처리 통합 검증 필요
 
 EventBridge를 함께 쓰는 경우:
 
@@ -154,11 +155,12 @@ SQS_REGION=ap-northeast-2
 
 ### service
 
-새 모드 후보:
+SQS 모드:
 
 ```env
 WORKER_EVENT_SOURCE=sqs
-SQS_QUEUE_URL=
+SQS_QUEUE_URL=https://sqs.ap-northeast-2.amazonaws.com/355222350664/moodot-ai-worker-events
+SQS_REGION=ap-northeast-2
 SQS_WAIT_TIME_SECONDS=20
 SQS_MAX_MESSAGES=5
 ```
@@ -171,6 +173,13 @@ Worker 흐름:
 4. `Pipeline.process_emotion({"record": memory})`
 5. 성공 시 SQS message delete
 6. 실패 시 delete 하지 않음
+
+구현 메모:
+
+- `service/events/sqs.py`가 SQS long polling과 message delete를 담당합니다.
+- 잘못된 JSON/지원하지 않는 event type은 poison message로 보고 삭제합니다.
+- 대상 memory가 없거나 처리 실패하면 message를 삭제하지 않아 SQS 재시도/DLQ 흐름을 사용합니다.
+- 이미 `processed=true`인 memory message는 중복 처리하지 않고 삭제합니다.
 
 ## 검증 순서
 

@@ -19,6 +19,7 @@ from config import LLMFactory
 from generators import MessageGenerator
 from agents import Pipeline
 from db import WorkerPostgresStore
+from events import SqsEventConsumer
 
 
 async def create_data_store():
@@ -52,6 +53,10 @@ async def periodic_check(store, pipeline: Pipeline) -> None:
     while True:
         await asyncio.sleep(5 * 60)
         await process_missed_emotions(store, pipeline)
+
+
+def get_worker_event_source() -> str:
+    return os.getenv("WORKER_EVENT_SOURCE", "polling").lower()
 
 
 async def initial_check(store, pipeline: Pipeline) -> None:
@@ -103,12 +108,22 @@ async def main() -> None:
 
     pipeline = Pipeline(data_store, intervention_repo, rule_engine, message_generator)
 
-    logger.info("👂 RDS polling 모드로 동작합니다.")
-    await asyncio.gather(
-        health_server(),
-        initial_check(data_store, pipeline),
-        periodic_check(data_store, pipeline),
-    )
+    if get_worker_event_source() == "sqs":
+        logger.info("👂 SQS 이벤트 모드로 동작합니다. RDS polling fallback도 유지합니다.")
+        sqs_consumer = SqsEventConsumer.from_env(data_store, pipeline)
+        await asyncio.gather(
+            health_server(),
+            initial_check(data_store, pipeline),
+            periodic_check(data_store, pipeline),
+            sqs_consumer.run_forever(),
+        )
+    else:
+        logger.info("👂 RDS polling 모드로 동작합니다.")
+        await asyncio.gather(
+            health_server(),
+            initial_check(data_store, pipeline),
+            periodic_check(data_store, pipeline),
+        )
 
 
 if __name__ == "__main__":

@@ -29,8 +29,9 @@ Browser -> Nginx HTTPS -> Next.js frontend -> Express backend -> RDS PostgreSQL
 ```
 
 New memory creation can also enqueue a lightweight `memory.created` event to SQS
-when the backend has `AI_EVENT_QUEUE_URL` configured. The AI Worker still keeps
-RDS polling as a fallback until SQS consumption is implemented.
+when the backend has `AI_EVENT_QUEUE_URL` configured. The AI Worker can consume
+that queue with `WORKER_EVENT_SOURCE=sqs`, while RDS polling stays as a recovery
+fallback.
 
 ## Local development
 
