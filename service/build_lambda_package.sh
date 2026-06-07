@@ -5,17 +5,18 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVICE_DIR="$ROOT_DIR/service"
 BUILD_DIR="$SERVICE_DIR/dist-lambda/build"
 ZIP_PATH="$SERVICE_DIR/dist-lambda/moodot-ai-worker-lambda.zip"
-DOCKER_IMAGE="python:3.11-slim"
+DOCKER_IMAGE="public.ecr.aws/lambda/python:3.11"
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 docker run --rm \
   --platform linux/amd64 \
+  --entrypoint /bin/sh \
   -v "$ROOT_DIR:/workspace" \
   -w /workspace \
   "$DOCKER_IMAGE" \
-  bash -lc "python -m pip install --upgrade pip && python -m pip install -r service/requirements.txt -t service/dist-lambda/build"
+  -lc "python -m pip install --upgrade pip && python -m pip install -r service/requirements.txt -t service/dist-lambda/build"
 
 cp "$SERVICE_DIR/lambda_handler.py" "$BUILD_DIR/"
 cp "$SERVICE_DIR/runtime.py" "$BUILD_DIR/"

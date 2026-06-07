@@ -134,8 +134,13 @@ SQS_MAX_MESSAGES=5
 ./service/build_lambda_package.sh
 ```
 
-이 스크립트는 로컬 macOS에서 직접 `pip install` 하지 않고, Docker의 `python:3.11-slim` 이미지를 사용해
-Lambda와 더 가까운 Linux 환경에서 의존성을 묶습니다.
+이 스크립트는 로컬 macOS에서 직접 `pip install` 하지 않고, Docker의
+`public.ecr.aws/lambda/python:3.11` 이미지를 사용해 Lambda 런타임과 맞는 환경에서 의존성을 묶습니다.
+
+이유:
+
+- 일반 Linux 이미지에서 만든 바이너리 패키지는 Lambda의 glibc 버전과 어긋날 수 있습니다.
+- 특히 `cryptography` 같은 패키지는 Lambda 전용 이미지에서 빌드하는 편이 안전합니다.
 
 선행 조건:
 
