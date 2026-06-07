@@ -107,3 +107,4 @@ docker run --rm -p 8000:8000 \
 
 Lambda 전환 작업 메모는 [docs/ai-worker-lambda-migration.md](/Users/jungho/Moodot-cloud/docs/ai-worker-lambda-migration.md)에 정리했습니다.
 로컬에서 Lambda 업로드용 zip을 만들려면 `./service/build_lambda_package.sh`를 실행하면 됩니다.
+이 스크립트는 Docker의 `python:3.11-slim` 이미지를 사용하므로, 실행 전 로컬 맥에서 Docker Desktop이 켜져 있어야 합니다.

@@ -5,8 +5,6 @@ Ollama 로컬 LLM 프로바이더
 import os
 import time
 import logging
-from langchain_community.chat_models import ChatOllama
-from langchain.schema import HumanMessage
 import ollama as ollama_client
 
 from .base_llm import BaseLLMProvider
@@ -39,26 +37,32 @@ class OllamaProvider(BaseLLMProvider):
                 f"다음 명령어로 다운로드하세요: ollama pull {model}"
             )
 
-        self._llm = ChatOllama(
-            model=model,
-            base_url=self.BASE_URL,
-            temperature=temperature,
-            num_predict=num_predict,
-        )
+        self._client = ollama_client.Client(host=self.BASE_URL)
+        self._model = model
+        self._temperature = temperature
+        self._num_predict = num_predict
         logger.info(f"✅ OllamaProvider 초기화: model={model}, temp={temperature}")
 
     @property
     def model_name(self) -> str:
-        return self._llm.model
+        return self._model
 
     def generate(self, prompt: str) -> tuple[str, dict]:
         start = time.time()
 
-        response = self._llm.invoke([HumanMessage(content=prompt)])
+        response = self._client.generate(
+            model=self._model,
+            prompt=prompt,
+            options={
+                "temperature": self._temperature,
+                "num_predict": self._num_predict,
+            },
+        )
+        text = response.get("response", "")
 
         elapsed = time.time() - start
         prompt_tokens = len(prompt.split())
-        completion_tokens = len(response.content.split())
+        completion_tokens = len(text.split())
 
         usage = {
             "elapsed_time": elapsed,
@@ -69,7 +73,7 @@ class OllamaProvider(BaseLLMProvider):
         }
 
         logger.info(f"💬 Ollama 호출 완료: {elapsed:.2f}초, ~{usage['total_tokens']} 토큰")
-        return response.content, usage
+        return text, usage
 
     # ── Ollama 전용 유틸리티 ──────────────────────────────────────────────────
 

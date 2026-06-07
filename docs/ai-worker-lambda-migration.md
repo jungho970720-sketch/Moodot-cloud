@@ -29,9 +29,20 @@ Lambda -> RDS read/write
 검증 완료:
 
 ```bash
-python3 -m compileall service
+python3 -m compileall service/lambda_handler.py service/events/sqs.py service/runtime.py service/config/ollama_provider.py service/prompts/message_prompts.py
 python3 -m pytest service/tests/test_lambda_handler.py service/tests/test_sqs_events.py service/tests/test_units_rules.py service/tests/test_rule_engine.py
 ```
+
+현재 AWS 반영 상태:
+
+- Lambda 함수 생성 완료: `moodot-ai-worker-lambda`
+- Handler 설정 완료: `lambda_handler.handler`
+- VPC / subnet 연결 완료
+- Lambda 환경변수 입력 완료
+- SQS 권한 부여 완료
+- SQS event source mapping 연결 완료
+
+즉, 남은 것은 인프라가 켜져 있을 때 실제 기록 생성으로 smoke test 하는 단계입니다.
 
 ## Lambda로 바뀌면서 달라지는 점
 
@@ -117,16 +128,18 @@ SQS_MAX_MESSAGES=5
 
 위치: 로컬 맥
 
-압축 대상:
-
-- `service/` 내부 코드 전체
-- 의존성 설치 결과물
-
 레포에 준비된 스크립트:
 
 ```bash
 ./service/build_lambda_package.sh
 ```
+
+이 스크립트는 로컬 macOS에서 직접 `pip install` 하지 않고, Docker의 `python:3.11-slim` 이미지를 사용해
+Lambda와 더 가까운 Linux 환경에서 의존성을 묶습니다.
+
+선행 조건:
+
+- 로컬 맥에 Docker Desktop 실행 중
 
 생성 결과:
 
@@ -162,9 +175,15 @@ Lambda role에 필요:
 
 - CloudWatch Logs 권한
 - VPC ENI 생성 권한
+- SQS 수신 권한
 - 필요 시 Secrets Manager 사용 권한
 
-SQS trigger를 붙이는 데 별도 polling 코드는 필요 없습니다.
+현재 추가한 SQS 권한:
+
+- `sqs:ReceiveMessage`
+- `sqs:DeleteMessage`
+- `sqs:GetQueueAttributes`
+- `sqs:ChangeMessageVisibility`
 
 ### 5. SQS 트리거 연결
 
@@ -177,6 +196,13 @@ SQS trigger를 붙이는 데 별도 polling 코드는 필요 없습니다.
 - Batch size는 작게 시작: `1~5`
 - partial batch response 사용 권장
 
+현재 연결 상태:
+
+- queue: `moodot-ai-worker-events`
+- batch size: `5`
+- partial batch response: 사용
+- 상태: `Enabled`
+
 ### 6. 테스트
 
 확인할 것:
@@ -186,6 +212,11 @@ SQS trigger를 붙이는 데 별도 polling 코드는 필요 없습니다.
 - `public.memories.processed=true`
 - `public.interventions` 생성 여부
 - DLQ 누적 여부
+
+주의:
+
+- EC2 / RDS가 꺼져 있으면 실제 smoke test는 진행할 수 없습니다.
+- 현재 계정은 비용 절감 모드로 자주 EC2 / RDS를 중지하므로, 테스트 전에는 둘 다 먼저 켜야 합니다.
 
 ## 네가 해야 할 것
 
@@ -204,4 +235,4 @@ AWS 콘솔에서 직접 확인/선택이 필요한 부분:
 - Lambda용 build/deploy 문서 보강
 - PM2 Worker를 Lambda 전환 후 어떻게 끌지 운영 순서 정리
 
-현재 이 문서 기준으로는 zip 생성 스크립트까지 준비된 상태입니다.
+현재 이 문서 기준으로는 Lambda 연결 자체는 끝났고, 마지막 실전 확인만 남은 상태입니다.

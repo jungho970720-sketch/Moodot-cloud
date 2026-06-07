@@ -2,7 +2,15 @@
 """
 메시지 생성용 프롬프트 템플릿
 """
-from langchain.prompts import PromptTemplate
+
+
+class PromptTemplate:
+    def __init__(self, input_variables: list[str], template: str):
+        self.input_variables = input_variables
+        self.template = template
+
+    def format(self, **kwargs) -> str:
+        return self.template.format(**kwargs)
 
 
 # 기본 시스템 프롬프트
